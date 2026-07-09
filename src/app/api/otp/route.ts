@@ -29,21 +29,24 @@ export async function POST(request: NextRequest) {
 
     blockchain.logAuditEvent('OTP_REQUESTED', sha256(admissionNumber), 'SYSTEM');
 
-    let emailSent = false;
+    let emailResult: { sent: boolean; error?: string; from?: string; to?: string } = { sent: false };
     if (student.email) {
-      emailSent = await sendOTPEmail(student.email, otp, student.name);
+      emailResult = await sendOTPEmail(student.email, otp, student.name);
     }
 
-    if (process.env.NODE_ENV !== 'production' || !emailSent) {
+    if (process.env.NODE_ENV !== 'production' || !emailResult.sent) {
       console.log(`[OTP] ${student.name} (${admissionNumber}): ${otp}`);
     }
 
     return NextResponse.json({
       success: true,
-      message: emailSent
+      message: emailResult.sent
         ? `OTP sent to ${student.email}`
-        : `OTP generated (demo mode). In production, this would be sent via email/SMS.`,
-      deliveryMethod: emailSent ? 'email' : 'demo',
+        : `OTP generated (email unavailable)`,
+      emailSent: emailResult.sent,
+      emailError: emailResult.error || null,
+      emailFrom: emailResult.from || null,
+      deliveryMethod: emailResult.sent ? 'email' : 'console',
       demoOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
       studentInfo: {
         name: student.name,

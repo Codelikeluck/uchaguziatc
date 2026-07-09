@@ -46,6 +46,7 @@ export default function VoterPage() {
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [notification, setNotification] = useState<{ type: 'success' | 'info'; message: string } | null>(null);
   const [election, setElection] = useState<any>(null);
 
   useEffect(() => {
@@ -65,6 +66,7 @@ export default function VoterPage() {
   const requestOTP = async () => {
     setLoading(true);
     setError('');
+    setNotification(null);
     try {
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
@@ -76,9 +78,14 @@ export default function VoterPage() {
         setStep('otp');
         setStudentInfo({
           name: data.studentName,
-          contactMethods: data.contactMethods,
+          contactMethods: data.emailSent ? ['email'] : [],
         });
         if (data.demoOtp) setDemoOtp(data.demoOtp);
+        if (data.emailSent) {
+          setNotification({ type: 'success', message: `OTP sent to ${data.studentEmail}` });
+        } else if (data.emailError) {
+          setNotification({ type: 'info', message: `Email delivery issue: ${data.emailError}. Using demo mode.` });
+        }
       } else {
         setError(data.error || 'Failed to send OTP');
       }
@@ -193,6 +200,21 @@ export default function VoterPage() {
             </div>
           ))}
         </div>
+
+        {notification && (
+          <div className={`rounded-lg p-4 mb-6 flex items-center gap-3 ${
+            notification.type === 'success'
+              ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+              : 'bg-amber-50 border border-amber-200 text-amber-700'
+          }`}>
+            {notification.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 flex-shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            )}
+            {notification.message}
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-center gap-3 text-red-700">

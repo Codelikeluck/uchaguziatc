@@ -18,36 +18,30 @@ function getConfig(): EmailConfig | null {
     port: parseInt(process.env.SMTP_PORT || '587', 10),
     user,
     pass,
-    from: process.env.EMAIL_FROM || `ATC Voting <${user}>`,
+    from: process.env.EMAIL_FROM || user,
   };
-}
-
-let transport: nodemailer.Transporter | null = null;
-
-function getTransport(): nodemailer.Transporter | null {
-  const config = getConfig();
-  if (!config) return null;
-  if (transport) return transport;
-  transport = nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.port === 465,
-    auth: { user: config.user, pass: config.pass },
-  });
-  return transport;
 }
 
 export async function sendOTPEmail(
   to: string,
   otp: string,
   studentName: string,
-): Promise<boolean> {
-  const tr = getTransport();
-  if (!tr) return false;
+): Promise<{ sent: boolean; error?: string; from?: string; to?: string }> {
+  const config = getConfig();
+  if (!config) {
+    return { sent: false, error: 'SMTP not configured (set SMTP_HOST, SMTP_USER, SMTP_PASS)' };
+  }
+
+  const transport = nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.port === 465,
+    auth: { user: config.user, pass: config.pass },
+  });
 
   try {
-    await tr.sendMail({
-      from: getConfig()!.from,
+    const info = await transport.sendMail({
+      from: config.from,
       to,
       subject: 'Your ATC Voting OTP Code',
       html: `
@@ -74,9 +68,11 @@ export async function sendOTPEmail(
         </div>
       `,
     });
-    return true;
-  } catch (err) {
-    console.error('Failed to send OTP email:', err);
-    return false;
+
+    return { sent: true, from: config.from, to };
+  } catch (err: any) {
+    const message = err?.message || String(err);
+    console.error('Email send failed:', message);
+    return { sent: false, error: message, from: config.from, to };
   }
 }
