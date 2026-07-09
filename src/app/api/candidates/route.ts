@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { sha256 } from '@/lib/crypto';
 import { blockchain } from '@/lib/mockBlockchain';
 
-function checkAdmin(request: NextRequest): boolean {
+async function checkAdmin(request: NextRequest): Promise<boolean> {
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) return false;
   return db.verifyAdminSession(authHeader.split(' ')[1]);
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    if (!checkAdmin(request)) {
+    if (!(await checkAdmin(request))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const { id, ...updates } = await request.json();
@@ -81,7 +81,7 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    if (!checkAdmin(request)) {
+    if (!(await checkAdmin(request))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const { searchParams } = new URL(request.url);

@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    if (!db.verifyAdminSession(token)) {
+    if (!(await db.verifyAdminSession(token))) {
       return NextResponse.json({ error: 'Invalid session. Please log out and log in again.' }, { status: 401 });
     }
 

@@ -1,6 +1,6 @@
 import { Student, Candidate, Election, Vote, Block, AuditEvent } from '@/types';
 import { sha256 } from './crypto';
-import { saveData, loadData } from './persist';
+import { saveData, loadData, loadDataSync } from './persist';
 
 interface DbSnapshot {
   students: [string, Student][];
@@ -22,43 +22,49 @@ class Database {
   private auditEvents: AuditEvent[] = [];
   private otps: Map<string, { otp: string; expires: number }> = new Map();
   private adminSessions: Map<string, { username: string; expires: number }> = new Map();
-  private savePending = false;
+  private persistQueue: Promise<void> = Promise.resolve();
 
   constructor() {
-    this.load().then(loaded => {
-      if (!loaded) this.seedData();
-    });
+    const data = loadDataSync();
+    if (data) {
+      this.loadFromData(data);
+    } else {
+      this.seedData();
+    }
+    this.syncFromKV();
   }
 
-  private async load(): Promise<boolean> {
+  private loadFromData(data: Record<string, any>) {
+    this.students = new Map(data.students || []);
+    this.candidates = new Map(data.candidates || []);
+    this.elections = new Map(data.elections || []);
+    this.votes = new Map(data.votes || []);
+    this.blocks = data.blocks || [];
+
+    this.auditEvents = (data.auditEvents || []).filter((e: any) => {
+      if (e.expires && Date.now() > e.expires) return false;
+      return true;
+    });
+
+    this.otps = new Map((data.otps || []).filter(([, v]: any) => Date.now() <= v.expires));
+    this.adminSessions = new Map((data.adminSessions || []).filter(([, v]: any) => Date.now() <= v.expires));
+  }
+
+  private async syncFromKV(): Promise<void> {
     try {
       const data = await loadData();
-      if (!data) return false;
-
-      this.students = new Map(data.students || []);
-      this.candidates = new Map(data.candidates || []);
-      this.elections = new Map(data.elections || []);
-      this.votes = new Map(data.votes || []);
-      this.blocks = data.blocks || [];
-
-      this.auditEvents = (data.auditEvents || []).filter((e: any) => {
-        if (e.expires && Date.now() > e.expires) return false;
-        return true;
-      });
-
-      this.otps = new Map((data.otps || []).filter(([, v]: any) => Date.now() <= v.expires));
-      this.adminSessions = new Map((data.adminSessions || []).filter(([, v]: any) => Date.now() <= v.expires));
-
-      return true;
-    } catch {
-      return false;
+      if (data) {
+        this.loadFromData(data);
+      } else if (this.students.size === 0) {
+        this.seedData();
+      }
+    } catch (err) {
+      console.error('KV sync failed (non-fatal):', err);
     }
   }
 
   private async persist(): Promise<void> {
-    if (this.savePending) return;
-    this.savePending = true;
-    try {
+    this.persistQueue = this.persistQueue.then(async () => {
       const snapshot: DbSnapshot = {
         students: Array.from(this.students.entries()),
         candidates: Array.from(this.candidates.entries()),
@@ -70,11 +76,8 @@ class Database {
         adminSessions: Array.from(this.adminSessions.entries()),
       };
       await saveData(snapshot as any);
-    } catch (err) {
-      console.error('Persist failed:', err);
-    } finally {
-      this.savePending = false;
-    }
+    });
+    await this.persistQueue;
   }
 
   private seedData() {
@@ -288,8 +291,18 @@ class Database {
     this.persist();
   }
 
-  verifyAdminSession(token: string): boolean {
-    const session = this.adminSessions.get(token);
+  async verifyAdminSession(token: string): Promise<boolean> {
+    let session = this.adminSessions.get(token);
+    if (!session) {
+      const snapshot = await loadData();
+      if (snapshot?.adminSessions) {
+        const found = (snapshot.adminSessions as [string, { username: string; expires: number }][]).find(([t]) => t === token);
+        if (found) {
+          session = found[1];
+          this.adminSessions.set(token, session);
+        }
+      }
+    }
     if (!session) return false;
     if (Date.now() > session.expires) {
       this.adminSessions.delete(token);
@@ -329,4 +342,5 @@ class Database {
   }
 }
 
-export const db = new Database();
+const db = new Database();
+export { db };

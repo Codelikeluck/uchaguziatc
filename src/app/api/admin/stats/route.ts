@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.split(' ')[1];
-    if (!db.verifyAdminSession(token)) {
+    if (!(await db.verifyAdminSession(token))) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
 

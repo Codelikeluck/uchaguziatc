@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.split(' ')[1];
-    if (!db.verifyAdminSession(token)) {
+    if (!(await db.verifyAdminSession(token))) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
 
@@ -77,7 +77,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const token = authHeader.split(' ')[1];
-    if (!db.verifyAdminSession(token)) {
+    if (!(await db.verifyAdminSession(token))) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
 
@@ -103,7 +103,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const token = authHeader.split(' ')[1];
-    if (!db.verifyAdminSession(token)) {
+    if (!(await db.verifyAdminSession(token))) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
 

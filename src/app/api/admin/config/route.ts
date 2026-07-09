@@ -4,11 +4,11 @@ import { sha256 } from '@/lib/crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { blockchain } from '@/lib/mockBlockchain';
 
-function checkAdmin(request: NextRequest): string | null {
+async function checkAdmin(request: NextRequest): Promise<string | null> {
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) return null;
   const token = authHeader.split(' ')[1];
-  return db.verifyAdminSession(token) ? token : null;
+  return (await db.verifyAdminSession(token)) ? token : null;
 }
 
 export async function POST(request: NextRequest) {
@@ -28,11 +28,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'verify') {
-      const valid = db.verifyAdminSession(token);
+      const valid = await db.verifyAdminSession(token);
       return NextResponse.json({ success: valid });
     }
 
-    const adminToken = checkAdmin(request);
+    const adminToken = await checkAdmin(request);
     if (!adminToken) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
