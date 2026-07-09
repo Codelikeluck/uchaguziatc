@@ -5,7 +5,6 @@ export interface Student {
   email: string;
   department: string;
   yearOfStudy: number;
-  gpa: number;
   hasVoted: boolean;
   walletAddress?: string;
   phone?: string;

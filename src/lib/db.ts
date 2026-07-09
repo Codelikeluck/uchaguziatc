@@ -40,10 +40,10 @@ class Database {
     this.elections.set(election.id, election);
 
     const sampleStudents = [
-      { id: 'stud_1', admissionNumber: '23050513012', name: 'Goodluck Francis', email: 'goodluck@atc.ac.tz', department: 'Computer Science', yearOfStudy: 4, gpa: 3.8 },
-      { id: 'stud_2', admissionNumber: '23050513013', name: 'Jane Lissah', email: 'jane@atc.ac.tz', department: 'ICT', yearOfStudy: 3, gpa: 3.9 },
-      { id: 'stud_3', admissionNumber: '23050513014', name: 'John Mushi', email: 'john@atc.ac.tz', department: 'Electrical', yearOfStudy: 2, gpa: 3.5 },
-      { id: 'stud_4', admissionNumber: '23050513015', name: 'Amina Juma', email: 'amina@atc.ac.tz', department: 'Civil Engineering', yearOfStudy: 4, gpa: 3.7 },
+      { id: 'stud_1', admissionNumber: '23050513012', name: 'Goodluck Francis', email: 'goodluck@atc.ac.tz', department: 'Computer Science', yearOfStudy: 4 },
+      { id: 'stud_2', admissionNumber: '23050513013', name: 'Jane Lissah', email: 'jane@atc.ac.tz', department: 'ICT', yearOfStudy: 3 },
+      { id: 'stud_3', admissionNumber: '23050513014', name: 'John Mushi', email: 'john@atc.ac.tz', department: 'Electrical', yearOfStudy: 2 },
+      { id: 'stud_4', admissionNumber: '23050513015', name: 'Amina Juma', email: 'amina@atc.ac.tz', department: 'Civil Engineering', yearOfStudy: 4 },
     ];
     sampleStudents.forEach(s => this.students.set(s.id, { ...s, hasVoted: false }));
 
@@ -109,6 +109,10 @@ class Database {
     return updated;
   }
 
+  deleteCandidate(id: string): boolean {
+    return this.candidates.delete(id);
+  }
+
   getElection(id: string): Election | undefined {
     return this.elections.get(id);
   }
@@ -123,6 +127,30 @@ class Database {
     const updated = { ...election, ...data };
     this.elections.set(id, updated);
     return updated;
+  }
+
+  getAllElections(): Election[] {
+    return Array.from(this.elections.values());
+  }
+
+  deleteElection(id: string): boolean {
+    return this.elections.delete(id);
+  }
+
+  getStudentsByDepartment(department: string): Student[] {
+    return Array.from(this.students.values()).filter(s => s.department.toLowerCase() === department.toLowerCase());
+  }
+
+  getStudentsByYear(year: number): Student[] {
+    return Array.from(this.students.values()).filter(s => s.yearOfStudy === year);
+  }
+
+  deleteStudents(ids: string[]): number {
+    let count = 0;
+    for (const id of ids) {
+      if (this.students.delete(id)) count++;
+    }
+    return count;
   }
 
   addVote(vote: Vote): Vote {

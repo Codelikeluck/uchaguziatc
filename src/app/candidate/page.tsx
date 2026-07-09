@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Users, FileText, Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Users, FileText, Upload, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
 
 export default function CandidatePage() {
   const [submitted, setSubmitted] = useState(false);
@@ -16,8 +16,41 @@ export default function CandidatePage() {
     gpa: '',
     yearOfStudy: '',
   });
+  const [documents, setDocuments] = useState<File[]>([]);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const docFileRef = useRef<HTMLInputElement>(null);
 
   const positions = ['President', 'Vice President', 'Secretary General', 'Treasurer'];
+
+  const uploadDocument = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', 'candidate_doc');
+
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+    return data.success ? data.url : '';
+  };
+
+  const handleAddDocuments = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    setUploadingDoc(true);
+    const newDocs: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      newDocs.push(files[i]);
+    }
+    setDocuments([...documents, ...newDocs]);
+    setUploadingDoc(false);
+    if (docFileRef.current) docFileRef.current.value = '';
+  };
+
+  const removeDocument = (index: number) => {
+    setDocuments(documents.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,13 +58,19 @@ export default function CandidatePage() {
     setError('');
 
     try {
+      const uploadedUrls: string[] = [];
+      for (const doc of documents) {
+        const url = await uploadDocument(doc);
+        if (url) uploadedUrls.push(url);
+      }
+
       const res = await fetch('/api/candidates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
           studentId: 'stud_' + Date.now(),
-          documents: [],
+          documents: uploadedUrls,
           status: 'pending',
           votes: 0,
         }),
@@ -181,10 +220,49 @@ export default function CandidatePage() {
                 />
               </div>
 
-              <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-atc-primary transition-colors cursor-pointer">
-                <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                <p className="text-sm text-slate-600 font-medium">Upload Supporting Documents</p>
-                <p className="text-xs text-slate-500 mt-1">Transcript, recommendation letter, nomination form (PDF)</p>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Supporting Documents</label>
+                <input
+                  type="file"
+                  ref={docFileRef}
+                  onChange={handleAddDocuments}
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  multiple
+                  className="hidden"
+                />
+                <div
+                  onClick={() => docFileRef.current?.click()}
+                  className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-atc-primary transition-colors cursor-pointer"
+                >
+                  <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                  <p className="text-sm text-slate-600 font-medium">Click to Upload Supporting Documents</p>
+                  <p className="text-xs text-slate-500 mt-1">Transcript, recommendation letter, nomination form (PDF, DOC, images)</p>
+                </div>
+                {uploadingDoc && (
+                  <div className="flex items-center gap-2 mt-2 text-sm text-slate-500">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Uploading...
+                  </div>
+                )}
+                {documents.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {documents.map((doc, i) => (
+                      <div key={i} className="flex items-center justify-between bg-slate-50 rounded-lg p-3 text-sm">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <FileText className="w-4 h-4 text-atc-primary flex-shrink-0" />
+                          <span className="truncate text-slate-700">{doc.name}</span>
+                          <span className="text-xs text-slate-400 flex-shrink-0">({(doc.size / 1024).toFixed(0)} KB)</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeDocument(i)}
+                          className="text-red-500 hover:text-red-700 flex-shrink-0 ml-2"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="bg-blue-50 rounded-lg p-4 text-sm text-slate-600">

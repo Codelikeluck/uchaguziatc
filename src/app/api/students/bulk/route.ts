@@ -5,6 +5,12 @@ import { sha256 } from '@/lib/crypto';
 import { blockchain } from '@/lib/mockBlockchain';
 import * as XLSX from 'xlsx';
 
+function getToken(request: NextRequest): string | null {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) return authHeader.split(' ')[1];
+  return null;
+}
+
 function parseExcel(buffer: Buffer): any[] {
   const workbook = XLSX.read(buffer, { type: 'buffer' });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -23,8 +29,6 @@ function parseExcel(buffer: Buffer): any[] {
     'dept': 'department',
     'year': 'yearOfStudy',
     'year of study': 'yearOfStudy',
-    'gpa': 'gpa',
-    'g.p.a': 'gpa',
     'phone': 'phone',
     'phone number': 'phone',
     'tel': 'phone',
@@ -37,8 +41,6 @@ function parseExcel(buffer: Buffer): any[] {
       const normalized = fieldMap[key.toLowerCase().trim()] || key;
       if (normalized === 'yearOfStudy' || normalized === 'year') {
         mapped['yearOfStudy'] = parseInt(String(val), 10) || 1;
-      } else if (normalized === 'gpa') {
-        mapped['gpa'] = parseFloat(String(val)) || 0;
       } else {
         mapped[normalized] = String(val).trim();
       }
@@ -65,8 +67,6 @@ function parseCsvText(text: string): any[] {
     'dept': 'department',
     'year': 'yearOfStudy',
     'year of study': 'yearOfStudy',
-    'gpa': 'gpa',
-    'g.p.a': 'gpa',
     'phone': 'phone',
     'phone number': 'phone',
     'tel': 'phone',
@@ -80,7 +80,6 @@ function parseCsvText(text: string): any[] {
       const key = fieldMap[h] || h;
       let val: any = values[i] || '';
       if (key === 'yearOfStudy') val = parseInt(val, 10) || 1;
-      else if (key === 'gpa') val = parseFloat(val) || 0;
       row[key] = val;
     });
     return row;
@@ -89,18 +88,15 @@ function parseCsvText(text: string): any[] {
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    const token = getToken(request);
+    if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const token = authHeader.split(' ')[1];
     if (!db.verifyAdminSession(token)) {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid session. Please log out and log in again.' }, { status: 401 });
     }
 
     let students: any[] = [];
-
     const contentType = request.headers.get('content-type') || '';
 
     if (contentType.includes('multipart/form-data')) {
@@ -156,7 +152,6 @@ export async function POST(request: NextRequest) {
         email: studentData.email || '',
         department: studentData.department || 'General',
         yearOfStudy: studentData.yearOfStudy || 1,
-        gpa: studentData.gpa || 0,
         phone: studentData.phone || '',
         hasVoted: false,
         walletAddress: '0x' + sha256(String(studentData.admissionNumber)).slice(0, 40),

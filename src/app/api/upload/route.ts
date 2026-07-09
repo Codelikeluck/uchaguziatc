@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 
+const MIME_MAP: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'application/pdf': 'pdf',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+};
+
+const ALLOWED_TYPES = Object.keys(MIME_MAP);
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -12,43 +24,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file received' }, { status: 400 });
     }
 
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json({ error: 'Only JPEG, PNG, WebP, GIF allowed' }, { status: 400 });
+    const ext = MIME_MAP[file.type];
+    if (!ext) {
+      return NextResponse.json({
+        error: `Unsupported file type: ${file.type}. Allowed: JPEG, PNG, WebP, GIF, PDF, DOC, DOCX`,
+      }, { status: 400 });
     }
 
-    // Validate file size (2MB max)
-    const maxSize = 2 * 1024 * 1024;
+    const maxSize = type === 'candidate_doc' ? 10 * 1024 * 1024 : 2 * 1024 * 1024;
     if (file.size > maxSize) {
-      return NextResponse.json({ error: 'File size exceeds 2MB limit' }, { status: 400 });
+      return NextResponse.json({
+        error: `File size exceeds ${type === 'candidate_doc' ? '10MB' : '2MB'} limit`,
+      }, { status: 400 });
     }
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Generate safe filename
     const timestamp = Date.now();
-    const ext = file.type.split('/')[1];
     const filename = `${type}_${timestamp}.${ext}`;
 
-    // For Vercel: use /tmp in production, public/uploads in dev
-    const uploadDir = process.env.VERCEL 
-      ? path.join('/tmp', 'uploads') 
+    const uploadDir = process.env.VERCEL
+      ? path.join('/tmp', 'uploads')
       : path.join(process.cwd(), 'public', 'uploads');
 
     await mkdir(uploadDir, { recursive: true });
     const filePath = path.join(uploadDir, filename);
     await writeFile(filePath, buffer);
 
-    // Return relative URL
     const url = `/uploads/${filename}`;
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       url,
       filename,
-      size: file.size 
+      size: file.size,
     });
   } catch (error) {
     console.error('Upload error:', error);

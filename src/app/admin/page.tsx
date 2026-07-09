@@ -17,7 +17,6 @@ interface Student {
   email: string;
   department: string;
   yearOfStudy: number;
-  gpa: number;
   hasVoted: boolean;
   phone?: string;
 }
@@ -29,6 +28,7 @@ interface Candidate {
   position: string;
   manifesto: string;
   imageUrl?: string;
+  documents?: string[];
   gpa: number;
   yearOfStudy: number;
   status: 'pending' | 'approved' | 'rejected';
@@ -59,7 +59,7 @@ export default function AdminPage() {
   const [studentSearch, setStudentSearch] = useState('');
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [newStudent, setNewStudent] = useState({
-    admissionNumber: '', name: '', email: '', department: '', yearOfStudy: 1, gpa: 0, phone: ''
+    admissionNumber: '', name: '', email: '', department: '', yearOfStudy: 1, phone: ''
   });
 
   // Candidates state
@@ -79,12 +79,21 @@ export default function AdminPage() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const bulkFileRef = useRef<HTMLInputElement>(null);
 
+  // Student filter & bulk delete state
+  const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
+  const [filterDepartment, setFilterDepartment] = useState('');
+  const [filterYear, setFilterYear] = useState('');
+
   // Elections state
   const [elections, setElections] = useState<Election[]>([]);
   const [showCreateElection, setShowCreateElection] = useState(false);
+  const [editingElection, setEditingElection] = useState<Election | null>(null);
   const [newElection, setNewElection] = useState({
     title: '', positions: ['President'], startDate: '', endDate: ''
   });
+
+  // Edit candidate state
+  const [editingCandidate, setEditingCandidate] = useState<Candidate | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('atc_admin_token');
@@ -172,7 +181,7 @@ export default function AdminPage() {
       if (data.success) {
         setStudents([...students, data.student]);
         setShowAddStudent(false);
-        setNewStudent({ admissionNumber: '', name: '', email: '', department: '', yearOfStudy: 1, gpa: 0, phone: '' });
+        setNewStudent({ admissionNumber: '', name: '', email: '', department: '', yearOfStudy: 1, phone: '' });
       } else {
         setError(data.error || 'Failed to add student');
       }
@@ -321,10 +330,12 @@ export default function AdminPage() {
     setLoggedIn(false); setToken(''); setStats(null);
   };
 
-  const filteredStudents = students.filter(s => 
-    s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
-    s.admissionNumber.includes(studentSearch)
-  );
+  const filteredStudents = students.filter(s => {
+    if (studentSearch && !s.name.toLowerCase().includes(studentSearch.toLowerCase()) && !s.admissionNumber.includes(studentSearch)) return false;
+    if (filterDepartment && s.department !== filterDepartment) return false;
+    if (filterYear && s.yearOfStudy !== parseInt(filterYear)) return false;
+    return true;
+  });
 
   if (!loggedIn) {
     return (
@@ -490,15 +501,97 @@ export default function AdminPage() {
 
             <div className="grid gap-4">
               {elections.map(election => (
-                <div key={election.id} className="atc-card flex items-center justify-between">
-                  <div>
-                    <h3 className="font-bold text-slate-900">{election.title}</h3>
-                    <p className="text-sm text-slate-600">Positions: {election.positions?.join(', ') || 'N/A'}</p>
-                    <p className="text-sm text-slate-500">{new Date(election.startDate).toLocaleDateString()} - {new Date(election.endDate).toLocaleDateString()}</p>
+                <div key={election.id} className="atc-card">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-slate-900">{election.title}</h3>
+                      <p className="text-sm text-slate-600">Positions: {election.positions?.join(', ') || 'N/A'}</p>
+                      <p className="text-sm text-slate-500">{new Date(election.startDate).toLocaleDateString()} - {new Date(election.endDate).toLocaleDateString()}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`atc-badge ${election.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                        {election.status}
+                      </span>
+                      <button
+                        onClick={() => setEditingElection(election)}
+                        className="p-2 text-slate-500 hover:text-atc-primary transition-colors"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Delete election "${election.title}"?`)) return;
+                          try {
+                            const res = await fetch('/api/admin/config', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                              body: JSON.stringify({ action: 'deleteElection', electionData: { id: election.id } }),
+                            });
+                            const data = await res.json();
+                            if (data.success) {
+                              setElections(elections.filter(e => e.id !== election.id));
+                            } else {
+                              setError(data.error);
+                            }
+                          } catch (e) { console.error('Delete election error:', e); }
+                        }}
+                        className="p-2 text-slate-500 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                  <span className={`atc-badge ${election.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                    {election.status}
-                  </span>
+                  {editingElection?.id === election.id && (
+                    <div className="mt-4 pt-4 border-t border-slate-200">
+                      <h4 className="text-sm font-bold text-slate-700 mb-3">Edit Election</h4>
+                      <div className="grid md:grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Title</label>
+                          <input type="text" value={editingElection.title}
+                            onChange={e => setEditingElection({...editingElection, title: e.target.value})}
+                            className="atc-input text-sm py-2" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Status</label>
+                          <select value={editingElection.status}
+                            onChange={e => setEditingElection({...editingElection, status: e.target.value as any})}
+                            className="atc-input text-sm py-2">
+                            <option value="upcoming">Upcoming</option>
+                            <option value="active">Active</option>
+                            <option value="closed">Closed</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            setLoading(true);
+                            try {
+                              const res = await fetch('/api/admin/config', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                body: JSON.stringify({ action: 'updateElection', electionData: editingElection }),
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                setElections(elections.map(e => e.id === editingElection.id ? data.election : e));
+                                setEditingElection(null);
+                              } else {
+                                setError(data.error);
+                              }
+                            } catch (e) { console.error('Edit election error:', e); }
+                            setLoading(false);
+                          }}
+                          className="atc-btn-primary text-sm py-2 px-4 inline-flex items-center gap-2 disabled:opacity-50"
+                          disabled={loading}
+                        >
+                          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                          Save
+                        </button>
+                        <button onClick={() => setEditingElection(null)} className="atc-btn-outline text-sm py-2 px-4">Cancel</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               {elections.length === 0 && (
@@ -576,6 +669,83 @@ export default function AdminPage() {
               </div>
             )}
 
+            {candidates.filter(c => c.status === 'pending').length > 0 && (
+              <div className="atc-card border-amber-200 bg-amber-50">
+                <h3 className="text-lg font-bold text-amber-800 mb-4 flex items-center gap-2">
+                  <FileText className="w-5 h-5" /> Pending Applications ({candidates.filter(c => c.status === 'pending').length})
+                </h3>
+                <div className="space-y-4">
+                  {candidates.filter(c => c.status === 'pending').map(candidate => (
+                    <div key={candidate.id} className="bg-white rounded-lg border border-amber-200 p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={candidate.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(candidate.name)}&background=1e40af&color=fff&size=200`}
+                            alt={candidate.name}
+                            className="w-12 h-12 rounded-full object-cover border-2 border-slate-200"
+                          />
+                          <div>
+                            <h4 className="font-bold text-slate-900">{candidate.name}</h4>
+                            <p className="text-sm text-atc-primary">{candidate.position}</p>
+                            <p className="text-xs text-slate-500">GPA: {candidate.gpa} | Year {candidate.yearOfStudy}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch('/api/admin/config', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                  body: JSON.stringify({ action: 'approveCandidate', candidateId: candidate.id }),
+                                });
+                                const data = await res.json();
+                                if (data.success) {
+                                  setCandidates(candidates.map(c => c.id === candidate.id ? { ...c, status: 'approved' } : c));
+                                }
+                              } catch (e) { console.error('Approve error:', e); }
+                            }}
+                            className="atc-btn-primary text-xs py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 inline-flex items-center gap-1"
+                          >
+                            <CheckCircle className="w-3 h-3" /> Approve
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch('/api/admin/config', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                  body: JSON.stringify({ action: 'rejectCandidate', candidateId: candidate.id }),
+                                });
+                                const data = await res.json();
+                                if (data.success) {
+                                  setCandidates(candidates.map(c => c.id === candidate.id ? { ...c, status: 'rejected' } : c));
+                                }
+                              } catch (e) { console.error('Reject error:', e); }
+                            }}
+                            className="atc-btn-outline text-xs py-1.5 px-3 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 inline-flex items-center gap-1"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-sm text-slate-600 bg-slate-50 rounded p-3 mb-2">{candidate.manifesto}</p>
+                      {candidate.documents && candidate.documents.length > 0 && (
+                        <div className="flex gap-2 mt-2">
+                          {candidate.documents.map((doc, i) => (
+                            <a key={i} href={doc} target="_blank" rel="noopener noreferrer"
+                              className="text-xs text-atc-primary hover:underline inline-flex items-center gap-1">
+                              <FileText className="w-3 h-3" /> Document {i + 1}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {candidates.map(candidate => (
                 <div key={candidate.id} className="atc-card">
@@ -591,19 +761,90 @@ export default function AdminPage() {
                       <p className="text-xs text-slate-500">GPA: {candidate.gpa} | Year {candidate.yearOfStudy}</p>
                       <p className="text-xs text-slate-500 mt-1">{candidate.votes} votes</p>
                     </div>
-                    <span className={`atc-badge text-xs ${
-                      candidate.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                      candidate.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                      'bg-red-100 text-red-700'
-                    }`}>
-                      {candidate.status}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`atc-badge text-xs ${
+                        candidate.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                        candidate.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {candidate.status}
+                      </span>
+                      <div className="flex gap-1 mt-1">
+                        <button
+                          onClick={() => setEditingCandidate(candidate)}
+                          className="p-1 text-slate-400 hover:text-atc-primary transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Delete candidate "${candidate.name}"?`)) return;
+                            try {
+                              const res = await fetch(`/api/candidates?id=${candidate.id}`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `Bearer ${token}` },
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                setCandidates(candidates.filter(c => c.id !== candidate.id));
+                              }
+                            } catch (e) { console.error('Delete candidate error:', e); }
+                          }}
+                          className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                   <p className="text-sm text-slate-600 mt-3 line-clamp-2">{candidate.manifesto}</p>
-                  {candidate.status === 'pending' && (
-                    <button onClick={() => approveCandidate(candidate.id)} className="mt-3 text-sm text-atc-primary hover:text-blue-800 font-medium">
-                      Approve Candidate
-                    </button>
+                  {editingCandidate?.id === candidate.id && (
+                    <div className="mt-3 pt-3 border-t border-slate-200">
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <div>
+                          <label className="text-xs text-slate-500">Position</label>
+                          <select value={editingCandidate.position}
+                            onChange={e => setEditingCandidate({...editingCandidate, position: e.target.value})}
+                            className="atc-input text-xs py-1.5">
+                            {['President', 'Vice President', 'Secretary General', 'Treasurer', 'Academic Rep', 'Sports Rep'].map(p => (
+                              <option key={p} value={p}>{p}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-500">Status</label>
+                          <select value={editingCandidate.status}
+                            onChange={e => setEditingCandidate({...editingCandidate, status: e.target.value as any})}
+                            className="atc-input text-xs py-1.5">
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch('/api/candidates', {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                body: JSON.stringify(editingCandidate),
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                setCandidates(candidates.map(c => c.id === editingCandidate.id ? data.candidate : c));
+                                setEditingCandidate(null);
+                              }
+                            } catch (e) { console.error('Edit candidate error:', e); }
+                          }}
+                          className="atc-btn-primary text-xs py-1.5 px-3 inline-flex items-center gap-1"
+                        >
+                          <CheckCircle className="w-3 h-3" /> Save
+                        </button>
+                        <button onClick={() => setEditingCandidate(null)} className="atc-btn-outline text-xs py-1.5 px-3">Cancel</button>
+                      </div>
+                    </div>
                   )}
                 </div>
               ))}
@@ -634,6 +875,63 @@ export default function AdminPage() {
                   <UserPlus className="w-4 h-4" /> Add Student
                 </button>
               </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 bg-slate-50 rounded-lg p-4 border border-slate-200">
+              <Filter className="w-4 h-4 text-slate-500" />
+              <select
+                value={filterDepartment}
+                onChange={e => setFilterDepartment(e.target.value)}
+                className="atc-input text-sm py-2 w-48"
+              >
+                <option value="">All Departments</option>
+                <option value="Computer Science">Computer Science</option>
+                <option value="ICT">ICT</option>
+                <option value="Electrical">Electrical</option>
+                <option value="Civil Engineering">Civil Engineering</option>
+                <option value="Mechanical">Mechanical</option>
+                <option value="Business">Business</option>
+              </select>
+              <select
+                value={filterYear}
+                onChange={e => setFilterYear(e.target.value)}
+                className="atc-input text-sm py-2 w-36"
+              >
+                <option value="">All Years</option>
+                <option value="1">Year 1</option>
+                <option value="2">Year 2</option>
+                <option value="3">Year 3</option>
+                <option value="4">Year 4</option>
+                <option value="5">Year 5</option>
+              </select>
+              {selectedStudents.size > 0 && (
+                <button
+                  onClick={async () => {
+                    if (!confirm(`Delete ${selectedStudents.size} selected student(s)?`)) return;
+                    try {
+                      const res = await fetch('/api/students/delete-bulk', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ ids: Array.from(selectedStudents) }),
+                      });
+                      const data = await res.json();
+                      if (data.success) {
+                        setStudents(students.filter(s => !selectedStudents.has(s.id)));
+                        setSelectedStudents(new Set());
+                        fetchStats(token);
+                      } else {
+                        setError(data.error);
+                      }
+                    } catch (e) { console.error('Bulk delete error:', e); setError('Network error'); }
+                  }}
+                  className="atc-btn-primary text-sm py-2 px-4 inline-flex items-center gap-2 bg-red-600 hover:bg-red-700"
+                >
+                  <Trash2 className="w-4 h-4" /> Delete {selectedStudents.size}
+                </button>
+              )}
+              <span className="text-xs text-slate-400 ml-auto">
+                {filteredStudents.length} student(s)
+              </span>
             </div>
 
             {showBulkUpload && (
@@ -731,10 +1029,6 @@ export default function AdminPage() {
                     <input type="number" min="1" max="5" value={newStudent.yearOfStudy} onChange={e => setNewStudent({...newStudent, yearOfStudy: parseInt(e.target.value)})} className="atc-input" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">GPA</label>
-                    <input type="number" step="0.1" min="0" max="5" value={newStudent.gpa} onChange={e => setNewStudent({...newStudent, gpa: parseFloat(e.target.value)})} className="atc-input" />
-                  </div>
-                  <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number (for OTP)</label>
                     <input type="tel" value={newStudent.phone} onChange={e => setNewStudent({...newStudent, phone: e.target.value})} className="atc-input" placeholder="+255..." />
                   </div>
@@ -753,23 +1047,48 @@ export default function AdminPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200">
+                    <th className="text-left py-3 px-2 w-10">
+                      <input
+                        type="checkbox"
+                        checked={filteredStudents.length > 0 && selectedStudents.size === filteredStudents.length}
+                        onChange={() => {
+                          if (selectedStudents.size === filteredStudents.length) {
+                            setSelectedStudents(new Set());
+                          } else {
+                            setSelectedStudents(new Set(filteredStudents.map(s => s.id)));
+                          }
+                        }}
+                        className="accent-atc-primary"
+                      />
+                    </th>
                     <th className="text-left py-3 px-4 font-medium text-slate-600">Admission #</th>
                     <th className="text-left py-3 px-4 font-medium text-slate-600">Name</th>
                     <th className="text-left py-3 px-4 font-medium text-slate-600">Department</th>
                     <th className="text-left py-3 px-4 font-medium text-slate-600">Year</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600">GPA</th>
                     <th className="text-left py-3 px-4 font-medium text-slate-600">Voted</th>
                     <th className="text-left py-3 px-4 font-medium text-slate-600">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredStudents.map(student => (
-                    <tr key={student.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <tr key={student.id} className={`border-b border-slate-100 hover:bg-slate-50 ${selectedStudents.has(student.id) ? 'bg-blue-50' : ''}`}>
+                      <td className="py-3 px-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedStudents.has(student.id)}
+                          onChange={() => {
+                            const next = new Set(selectedStudents);
+                            if (next.has(student.id)) next.delete(student.id);
+                            else next.add(student.id);
+                            setSelectedStudents(next);
+                          }}
+                          className="accent-atc-primary"
+                        />
+                      </td>
                       <td className="py-3 px-4 font-mono text-xs">{student.admissionNumber}</td>
                       <td className="py-3 px-4 font-medium">{student.name}</td>
                       <td className="py-3 px-4">{student.department}</td>
-                      <td className="py-3 px-4">{student.yearOfStudy}</td>
-                      <td className="py-3 px-4">{student.gpa}</td>
+                      <td className="py-3 px-4">Year {student.yearOfStudy}</td>
                       <td className="py-3 px-4">
                         {student.hasVoted ? (
                           <span className="atc-badge bg-emerald-100 text-emerald-700 text-xs"><CheckCircle className="w-3 h-3 mr-1" /> Yes</span>
