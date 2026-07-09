@@ -459,7 +459,7 @@ export default function VoterPage() {
                                   <img 
                                     src={vp.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(vp.name)}&background=8b5cf6&color=fff&size=200`}
                                     alt={vp.name}
-                                    className="w-10 h-10 rounded-full object-cover border border-slate-300"
+                                    className="w-14 h-14 rounded-full object-cover border border-slate-300"
                                   />
                                   <div>
                                     <span className="text-sm font-medium text-slate-700">{vp.name}</span>

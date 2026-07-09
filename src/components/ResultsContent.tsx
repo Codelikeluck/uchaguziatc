@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { 
   ArrowLeft, BarChart3, Shield, Blocks, Search, CheckCircle, 
-  AlertCircle, Loader2, TrendingUp, Users, Clock 
+  AlertCircle, Loader2, TrendingUp, Users, Clock, Crown, Award 
 } from 'lucide-react';
 import CountdownTimer from '@/components/CountdownTimer';
 
@@ -105,6 +105,15 @@ export default function ResultsContent() {
     }
   };
 
+  const isClosed = election?.status === 'closed';
+  const winnerSlate = isClosed ? results.map(r => {
+    const winner = r.candidates[0];
+    const runnerUp = r.candidates[1];
+    const margin = winner ? winner.votes - (runnerUp?.votes || 0) : 0;
+    const totalVotes = r.candidates.reduce((s, c) => s + c.votes, 0);
+    return { ...r, winner, margin, totalVotes };
+  }) : [];
+
   const handleVerify = async (hash: string) => {
     setLoading(true);
     try {
@@ -138,7 +147,15 @@ export default function ResultsContent() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {election?.endDate && (
+        {isClosed ? (
+          <div className="atc-card bg-gradient-to-r from-emerald-600 to-emerald-800 text-white mb-8">
+            <div className="text-center py-2">
+              <Crown className="w-10 h-10 text-amber-300 mx-auto mb-2" />
+              <h2 className="text-2xl font-bold">Election Results — Winners Declared</h2>
+              <p className="text-emerald-200 text-sm">{election?.title}</p>
+            </div>
+          </div>
+        ) : election?.endDate && (
           <div className="atc-card bg-gradient-to-r from-atc-primary to-blue-700 text-white mb-8">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-3">
@@ -251,10 +268,13 @@ export default function ResultsContent() {
 
         {activeTab === 'results' && (
           <div className="space-y-8">
-            {results.map((result) => (
+            {results.map((result) => {
+              const isWinner = isClosed && result.candidates[0];
+              const thisWinner = isClosed ? winnerSlate.find(w => w.position === result.position) : null;
+              return (
               <div key={result.position} className="atc-card">
                 <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-atc-primary" />
+                  {isClosed ? <Crown className="w-5 h-5 text-amber-500" /> : <TrendingUp className="w-5 h-5 text-atc-primary" />}
                   {result.position}
                 </h3>
                 <div className="space-y-4">
@@ -270,7 +290,12 @@ export default function ResultsContent() {
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="font-medium text-slate-900">{candidate.name}</span>
-                              {idx === 0 && (
+                              {idx === 0 && isClosed && (
+                                <span className="atc-badge bg-emerald-100 text-emerald-700 text-xs font-semibold inline-flex items-center gap-1">
+                                  <Crown className="w-3 h-3" /> Winner
+                                </span>
+                              )}
+                              {idx === 0 && !isClosed && (
                                 <span className="atc-badge bg-amber-100 text-amber-700 text-xs">
                                   Leading
                                 </span>
@@ -313,11 +338,18 @@ export default function ResultsContent() {
                           style={{ width: `${candidate.percentage}%` }}
                         />
                       </div>
+                      {isClosed && idx === 0 && thisWinner && (
+                        <div className="mt-2 text-sm">
+                          <span className="text-emerald-700 font-medium">
+                            Won by {thisWinner.margin} vote{thisWinner.margin !== 1 ? 's' : ''} ({thisWinner.winner?.percentage}% of {thisWinner.totalVotes} total votes)
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
-            ))}
+            )})}
 
             {results.length === 0 && (
               <div className="atc-card text-center py-12">

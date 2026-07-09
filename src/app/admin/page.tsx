@@ -33,6 +33,8 @@ interface Candidate {
   yearOfStudy: number;
   status: 'pending' | 'approved' | 'rejected';
   votes: number;
+  admissionNumber?: string;
+  runningMateId?: string;
 }
 
 interface Election {
@@ -70,11 +72,14 @@ export default function AdminPage() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [showAddCandidate, setShowAddCandidate] = useState(false);
   const [newCandidate, setNewCandidate] = useState({
-    name: '', admissionNumber: '', position: 'President', manifesto: '', gpa: 0, yearOfStudy: 1
+    name: '', admissionNumber: '', position: 'President', manifesto: '', gpa: 0, yearOfStudy: 1, runningMateId: ''
   });
   const [candidateImage, setCandidateImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState('');
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   // Bulk upload state
   const [showBulkUpload, setShowBulkUpload] = useState(false);
@@ -248,6 +253,15 @@ export default function AdminPage() {
     reader.readAsDataURL(file);
   };
 
+  const handleEditImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEditImageFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setEditImagePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
   const uploadImage = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('file', file);
@@ -282,7 +296,7 @@ export default function AdminPage() {
       if (data.success) {
         setCandidates([...candidates, data.candidate]);
         setShowAddCandidate(false);
-        setNewCandidate({ name: '', admissionNumber: '', position: 'President', manifesto: '', gpa: 0, yearOfStudy: 1 });
+        setNewCandidate({ name: '', admissionNumber: '', position: 'President', manifesto: '', gpa: 0, yearOfStudy: 1, runningMateId: '' });
         setCandidateImage(null);
         setImagePreview('');
       } else {
@@ -380,6 +394,8 @@ export default function AdminPage() {
     localStorage.removeItem('atc_admin_token');
     setLoggedIn(false); setToken(''); setStats(null);
   };
+
+  const vpCandidates = candidates.filter(c => c.position === 'Vice President' && (c.status === 'approved' || c.status === 'pending'));
 
   const filteredStudents = students.filter(s => {
     if (studentSearch && !s.name.toLowerCase().includes(studentSearch.toLowerCase()) && !s.admissionNumber.includes(studentSearch)) return false;
@@ -680,14 +696,28 @@ export default function AdminPage() {
                     <label className="block text-sm font-medium text-slate-700 mb-1">Admission Number</label>
                     <input type="text" value={newCandidate.admissionNumber} onChange={e => setNewCandidate({...newCandidate, admissionNumber: e.target.value})} className="atc-input" placeholder="23050513012" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Position</label>
-                    <select value={newCandidate.position} onChange={e => setNewCandidate({...newCandidate, position: e.target.value})} className="atc-input">
-                      {['President', 'Vice President', 'Secretary General', 'Treasurer', 'Academic Rep', 'Sports Rep'].map(p => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
-                    </select>
-                  </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Position</label>
+                      <select value={newCandidate.position} onChange={e => setNewCandidate({...newCandidate, position: e.target.value})} className="atc-input">
+                        {['President', 'Vice President', 'Secretary General', 'Treasurer', 'Academic Rep', 'Sports Rep'].map(p => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {newCandidate.position === 'President' && (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Running Mate (VP)</label>
+                        <select value={newCandidate.runningMateId} onChange={e => setNewCandidate({...newCandidate, runningMateId: e.target.value})} className="atc-input">
+                          <option value="">Select Vice President</option>
+                          {vpCandidates.map(vp => (
+                            <option key={vp.id} value={vp.id}>{vp.name}</option>
+                          ))}
+                        </select>
+                        {vpCandidates.length === 0 && (
+                          <p className="text-xs text-amber-600 mt-1">No VP candidates registered yet.</p>
+                        )}
+                      </div>
+                    )}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">GPA</label>
                     <input type="number" step="0.1" min="0" max="5" value={newCandidate.gpa} onChange={e => setNewCandidate({...newCandidate, gpa: parseFloat(e.target.value)})} className="atc-input" />
@@ -856,6 +886,18 @@ export default function AdminPage() {
                     <div className="mt-3 pt-3 border-t border-slate-200">
                       <div className="grid grid-cols-2 gap-2 mb-2">
                         <div>
+                          <label className="text-xs text-slate-500">Full Name</label>
+                          <input type="text" value={editingCandidate.name}
+                            onChange={e => setEditingCandidate({...editingCandidate, name: e.target.value})}
+                            className="atc-input text-xs py-1.5" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-500">Admission Number</label>
+                          <input type="text" value={editingCandidate.admissionNumber || ''}
+                            onChange={e => setEditingCandidate({...editingCandidate, admissionNumber: e.target.value})}
+                            className="atc-input text-xs py-1.5" />
+                        </div>
+                        <div>
                           <label className="text-xs text-slate-500">Position</label>
                           <select value={editingCandidate.position}
                             onChange={e => setEditingCandidate({...editingCandidate, position: e.target.value})}
@@ -875,20 +917,73 @@ export default function AdminPage() {
                             <option value="rejected">Rejected</option>
                           </select>
                         </div>
+                        <div>
+                          <label className="text-xs text-slate-500">GPA</label>
+                          <input type="number" step="0.1" min="0" max="5" value={editingCandidate.gpa}
+                            onChange={e => setEditingCandidate({...editingCandidate, gpa: parseFloat(e.target.value)})}
+                            className="atc-input text-xs py-1.5" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-500">Year of Study</label>
+                          <input type="number" min="1" max="5" value={editingCandidate.yearOfStudy}
+                            onChange={e => setEditingCandidate({...editingCandidate, yearOfStudy: parseInt(e.target.value) || 1})}
+                            className="atc-input text-xs py-1.5" />
+                        </div>
+                        {editingCandidate.position === 'President' && (
+                          <div>
+                            <label className="text-xs text-slate-500">Running Mate (VP)</label>
+                            <select value={editingCandidate.runningMateId || ''}
+                              onChange={e => setEditingCandidate({...editingCandidate, runningMateId: e.target.value})}
+                              className="atc-input text-xs py-1.5">
+                              <option value="">Select Vice President</option>
+                              {vpCandidates.map(vp => (
+                                <option key={vp.id} value={vp.id}>{vp.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                        <div>
+                          <label className="text-xs text-slate-500">Profile Photo</label>
+                          <div className="flex items-center gap-2">
+                            <input type="file" ref={editFileInputRef} onChange={handleEditImageSelect} accept="image/*" className="hidden" />
+                            <button onClick={() => editFileInputRef.current?.click()} className="atc-btn-outline text-xs py-1 px-2 inline-flex items-center gap-1">
+                              <ImageIcon className="w-3 h-3" /> Change Photo
+                            </button>
+                            {editImagePreview && (
+                              <img src={editImagePreview} alt="Preview" className="w-8 h-8 rounded-full object-cover border border-atc-primary" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mb-2">
+                        <label className="text-xs text-slate-500">Manifesto</label>
+                        <textarea value={editingCandidate.manifesto}
+                          onChange={e => setEditingCandidate({...editingCandidate, manifesto: e.target.value})}
+                          rows={2} className="atc-input text-xs py-1.5" />
                       </div>
                       <div className="flex gap-2">
                         <button
                           onClick={async () => {
                             try {
+                              let imageUrl = editingCandidate.imageUrl || '';
+                              if (editImageFile) {
+                                const url = await uploadImage(editImageFile);
+                                if (url) imageUrl = url;
+                              }
                               const res = await fetch('/api/candidates', {
                                 method: 'PUT',
                                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                                body: JSON.stringify(editingCandidate),
+                                body: JSON.stringify({
+                                  ...editingCandidate,
+                                  imageUrl,
+                                }),
                               });
                               const data = await res.json();
                               if (data.success) {
                                 setCandidates(candidates.map(c => c.id === editingCandidate.id ? data.candidate : c));
                                 setEditingCandidate(null);
+                                setEditImageFile(null);
+                                setEditImagePreview('');
                               }
                             } catch (e) { console.error('Edit candidate error:', e); }
                           }}
@@ -896,7 +991,7 @@ export default function AdminPage() {
                         >
                           <CheckCircle className="w-3 h-3" /> Save
                         </button>
-                        <button onClick={() => setEditingCandidate(null)} className="atc-btn-outline text-xs py-1.5 px-3">Cancel</button>
+                        <button onClick={() => { setEditingCandidate(null); setEditImageFile(null); setEditImagePreview(''); }} className="atc-btn-outline text-xs py-1.5 px-3">Cancel</button>
                       </div>
                     </div>
                   )}
