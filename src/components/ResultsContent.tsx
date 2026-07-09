@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { 
   ArrowLeft, BarChart3, Shield, Blocks, Search, CheckCircle, 
-  AlertCircle, Loader2, TrendingUp, Users 
+  AlertCircle, Loader2, TrendingUp, Users, Clock 
 } from 'lucide-react';
+import CountdownTimer from '@/components/CountdownTimer';
 
 interface Result {
   position: string;
@@ -32,12 +33,22 @@ export default function ResultsContent() {
   const [verifyInput, setVerifyInput] = useState(verifyHash || '');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'results' | 'explorer'>('results');
+  const [election, setElection] = useState<any>(null);
 
   useEffect(() => {
+    fetchElection();
     fetchResults();
     fetchBlocks();
     if (verifyHash) handleVerify(verifyHash);
   }, []);
+
+  const fetchElection = async () => {
+    try {
+      const res = await fetch('/api/elections');
+      const data = await res.json();
+      if (data.success) setElection(data.election);
+    } catch (e) { console.error('Failed to fetch election:', e); }
+  };
 
   const fetchResults = async () => {
     try {
@@ -127,6 +138,25 @@ export default function ResultsContent() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
+        {election?.endDate && (
+          <div className="atc-card bg-gradient-to-r from-atc-primary to-blue-700 text-white mb-8">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <Clock className="w-6 h-6 text-blue-200" />
+                <div>
+                  <p className="text-sm text-blue-200 font-medium">Voting ends in</p>
+                  <CountdownTimer endDate={election.endDate} compact />
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-blue-200">{election.title}</p>
+                <p className="text-xs text-blue-300">
+                  Started {new Date(election.startDate).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Verification Hero */}
         <div className="atc-card mb-8">
           <div className="text-center mb-6">

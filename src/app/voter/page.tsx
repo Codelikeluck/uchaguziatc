@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Shield, ArrowLeft, CheckCircle, Lock, Fingerprint, 
-  Vote, Receipt, AlertCircle, Loader2 
+  Vote, Receipt, AlertCircle, Loader2, Clock 
 } from 'lucide-react';
+import CountdownTimer from '@/components/CountdownTimer';
 
 interface Student {
   id: string;
@@ -372,9 +373,17 @@ export default function VoterPage() {
                   <h2 className="text-xl font-bold text-slate-900">Welcome, {student.name}</h2>
                   <p className="text-slate-600">{student.department} · {student.admissionNumber}</p>
                 </div>
-                <div className="atc-badge bg-blue-100 text-atc-primary">
-                  <Shield className="w-3 h-3 mr-1" />
-                  Verified Voter
+                <div className="flex items-center gap-3">
+                  {election?.endDate && (
+                    <div className="hidden sm:flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      <Clock className="w-4 h-4 text-amber-600" />
+                      <CountdownTimer endDate={election.endDate} compact />
+                    </div>
+                  )}
+                  <div className="atc-badge bg-blue-100 text-atc-primary">
+                    <Shield className="w-3 h-3 mr-1" />
+                    Verified Voter
+                  </div>
                 </div>
               </div>
             </div>
@@ -390,6 +399,22 @@ export default function VoterPage() {
               </div>
             ) : (
               <div className="space-y-8">
+                {election?.endDate && (
+                  <div className="atc-card bg-gradient-to-r from-atc-primary to-blue-700 text-white">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Clock className="w-6 h-6 text-blue-200" />
+                        <div>
+                          <p className="text-sm text-blue-200 font-medium">Voting ends in</p>
+                          <CountdownTimer endDate={election.endDate} compact />
+                        </div>
+                      </div>
+                      <span className="text-xs text-blue-200">
+                        {election.title}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 <div className="atc-card">
                   <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
                     <Vote className="w-5 h-5 text-atc-primary" />

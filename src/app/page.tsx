@@ -1,9 +1,16 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Shield, Vote, BarChart3, Lock, Blocks, Users, ChevronRight } from 'lucide-react';
+import { Shield, Vote, BarChart3, Lock, Blocks, Users, ChevronRight, Clock } from 'lucide-react';
+import CountdownTimer from '@/components/CountdownTimer';
 
 export default function HomePage() {
+  const [election, setElection] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/elections').then(r => r.json()).then(d => { if (d.success) setElection(d.election); }).catch(() => {});
+  }, []);
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       {/* Header */}
@@ -36,6 +43,21 @@ export default function HomePage() {
           </div>
         </div>
       </header>
+
+      {election?.endDate && (
+        <div className="bg-gradient-to-r from-atc-primary to-blue-700">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 text-white">
+              <Clock className="w-4 h-4 text-blue-200" />
+              <span className="text-sm text-blue-100">{election.title}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-blue-200 font-medium">Voting ends in</span>
+              <CountdownTimer endDate={election.endDate} compact />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-20 pb-32">
