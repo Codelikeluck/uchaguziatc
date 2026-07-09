@@ -2,7 +2,7 @@ import { Pool } from '@neondatabase/serverless';
 
 let pool: Pool | null = null;
 
-function getPool(): Pool | null {
+export function getPool(): Pool | null {
   if (pool) return pool;
   const url = process.env.DATABASE_URL;
   if (!url) return null;
@@ -129,13 +129,16 @@ export async function neonInitTables(): Promise<boolean> {
 
 export async function neonSaveSnapshot(data: Record<string, any>): Promise<boolean> {
   const p = getPool();
-  if (!p) return false;
+  if (!p) { console.log('neonSaveSnapshot: no pool'); return false; }
   try {
+    const json = JSON.stringify(data);
+    console.log(`neonSaveSnapshot: data size ${json.length} bytes`);
     await p.query(
       `INSERT INTO snapshots (id, data, updated_at) VALUES ('main', $1, NOW())
        ON CONFLICT (id) DO UPDATE SET data = $1, updated_at = NOW()`,
-      [JSON.stringify(data)]
+      [json]
     );
+    console.log('neonSaveSnapshot: success');
     return true;
   } catch (err) {
     console.error('Neon save snapshot failed:', err);
@@ -147,9 +150,13 @@ export async function neonLoadSnapshot(): Promise<Record<string, any> | null> {
   const p = getPool();
   if (!p) { console.warn('Neon: no pool (DATABASE_URL not set or invalid)'); return null; }
   try {
+    console.log('neonLoadSnapshot: querying snapshots table');
     const { rows } = await p.query(`SELECT data FROM snapshots WHERE id = 'main'`);
+    console.log(`neonLoadSnapshot: rows returned ${rows.length}`);
     if (rows.length === 0) return null;
-    return rows[0].data as Record<string, any>;
+    const data = rows[0].data as Record<string, any>;
+    console.log(`neonLoadSnapshot: loaded (keys: ${Object.keys(data).join(', ')})`);
+    return data;
   } catch (err) {
     console.error('Neon load snapshot failed:', err);
     return null;

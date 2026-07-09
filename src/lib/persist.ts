@@ -26,18 +26,26 @@ export async function loadData(): Promise<Record<string, any> | null> {
     if (!neonInited) {
       neonInited = await neonInitTables();
     }
-    // Always try to load the snapshot, even if table init failed
-    // (the snapshots table may already exist from a previous run)
+    console.log(`loadData: neonInited=${neonInited}, trying neonLoadSnapshot`);
     const neonData = await neonLoadSnapshot();
     if (neonData) {
+      console.log(`loadData: neon snapshot found (students: ${neonData.students?.length || 0})`);
       neonSyncAll(neonData);
       return neonData;
     }
+    console.log('loadData: neon returned null, falling through');
+  } else {
+    console.log('loadData: DATABASE_URL not set, skipping neon');
   }
 
+  console.log('loadData: trying KV');
   const kvData = await kvGet<Record<string, any>>(KV_KEY);
-  if (kvData) return kvData;
+  if (kvData) {
+    console.log('loadData: KV found data');
+    return kvData;
+  }
 
+  console.log('loadData: trying file');
   return loadDataSync();
 }
 
@@ -48,9 +56,9 @@ export async function saveData(data: Record<string, any>): Promise<void> {
     if (!neonInited) {
       neonInited = await neonInitTables();
     }
-    // Always try to save, even if table init failed
-    // (the snapshots table may already exist from a previous run)
+    console.log(`saveData: neonInited=${neonInited}, trying neonSaveSnapshot`);
     const neonOk = await neonSaveSnapshot(data);
+    console.log(`saveData: neonSaveSnapshot returned ${neonOk}`);
     if (neonOk) {
       neonSyncAll(data);
       savedToNeon = true;
@@ -58,17 +66,17 @@ export async function saveData(data: Record<string, any>): Promise<void> {
   }
 
   const kvOk = await kvSet(KV_KEY, data);
+  console.log(`saveData: kvSet returned ${kvOk}`);
 
   try {
     mkdirSync(DATA_DIR, { recursive: true });
     const tmpPath = DATA_FILE + '.tmp.' + Date.now();
     writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
     renameSync(tmpPath, DATA_FILE);
+    console.log('saveData: file written');
   } catch (err) {
     console.error('File fallback write failed:', err);
   }
 
-  if (!savedToNeon && !kvOk) {
-    console.warn('saveData: all remote backends failed, data only on local file');
-  }
+  console.log(`saveData: complete (neon=${savedToNeon}, kv=${kvOk}, file=true)`);
 }
