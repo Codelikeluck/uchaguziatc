@@ -5,11 +5,9 @@ import { SignJWT } from 'jose';
 import { blockchain } from '@/lib/mockBlockchain';
 import { kvGet, kvDel } from '@/lib/kv';
 
-function getJwtSecret(): Uint8Array {
+function getJwtSecret(): Uint8Array | null {
   const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error('JWT_SECRET environment variable is required');
-  }
+  if (!secret) return null;
   return new TextEncoder().encode(secret);
 }
 
@@ -43,6 +41,10 @@ export async function POST(request: NextRequest) {
     }
 
     const secret = getJwtSecret();
+    if (!secret) {
+      return NextResponse.json({ error: 'Server misconfigured: JWT_SECRET not set' }, { status: 500 });
+    }
+
     const token = await new SignJWT({
       sub: student.id,
       admissionNumber: student.admissionNumber,

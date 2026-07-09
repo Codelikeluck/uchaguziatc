@@ -58,8 +58,12 @@ export async function saveData(data: Record<string, any>): Promise<void> {
   const kvOk = await kvSet(KV_KEY, data);
   if (kvOk) return;
 
-  mkdirSync(DATA_DIR, { recursive: true });
-  const tmpPath = DATA_FILE + '.tmp.' + Date.now();
-  writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
-  renameSync(tmpPath, DATA_FILE);
+  try {
+    mkdirSync(DATA_DIR, { recursive: true });
+    const tmpPath = DATA_FILE + '.tmp.' + Date.now();
+    writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
+    renameSync(tmpPath, DATA_FILE);
+  } catch (err) {
+    console.error('File fallback write failed:', err);
+  }
 }
