@@ -15,8 +15,10 @@ function getPool(): Pool | null {
 export async function neonInitTables(): Promise<boolean> {
   const p = getPool();
   if (!p) { console.warn('Neon initTables: DATABASE_URL not set, skipping'); return false; }
-  try {
-    await p.query(`CREATE TABLE IF NOT EXISTS students (
+  let allOk = true;
+
+  const tables = [
+    `CREATE TABLE IF NOT EXISTS students (
       id TEXT PRIMARY KEY,
       admission_number TEXT UNIQUE NOT NULL,
       name TEXT NOT NULL,
@@ -26,11 +28,10 @@ export async function neonInitTables(): Promise<boolean> {
       phone TEXT,
       has_voted BOOLEAN DEFAULT FALSE,
       wallet_address TEXT
-    )`);
-
-    await p.query(`CREATE TABLE IF NOT EXISTS candidates (
+    )`,
+    `CREATE TABLE IF NOT EXISTS candidates (
       id TEXT PRIMARY KEY,
-      student_id TEXT REFERENCES students(id) ON DELETE SET NULL,
+      student_id TEXT,
       name TEXT NOT NULL,
       position TEXT NOT NULL,
       manifesto TEXT,
@@ -40,9 +41,8 @@ export async function neonInitTables(): Promise<boolean> {
       year_of_study INTEGER DEFAULT 1,
       status TEXT DEFAULT 'pending',
       votes INTEGER DEFAULT 0
-    )`);
-
-    await p.query(`CREATE TABLE IF NOT EXISTS elections (
+    )`,
+    `CREATE TABLE IF NOT EXISTS elections (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       positions JSONB DEFAULT '[]',
@@ -51,70 +51,78 @@ export async function neonInitTables(): Promise<boolean> {
       status TEXT DEFAULT 'inactive',
       total_voters INTEGER DEFAULT 0,
       total_votes INTEGER DEFAULT 0
-    )`);
-
-    await p.query(`CREATE TABLE IF NOT EXISTS votes (
+    )`,
+    `CREATE TABLE IF NOT EXISTS votes (
       vote_hash TEXT PRIMARY KEY,
       student_id TEXT,
       candidate_id TEXT,
       election_id TEXT,
       timestamp BIGINT NOT NULL
-    )`);
-
-    await p.query(`CREATE TABLE IF NOT EXISTS blocks (
+    )`,
+    `CREATE TABLE IF NOT EXISTS blocks (
       block_index INTEGER PRIMARY KEY,
       timestamp BIGINT NOT NULL,
       previous_hash TEXT NOT NULL DEFAULT '',
       hash TEXT NOT NULL,
       data JSONB DEFAULT '{}',
       nonce INTEGER DEFAULT 0
-    )`);
-
-    await p.query(`CREATE TABLE IF NOT EXISTS audit_events (
+    )`,
+    `CREATE TABLE IF NOT EXISTS audit_events (
       id SERIAL PRIMARY KEY,
       event_type TEXT NOT NULL,
       data TEXT,
       timestamp BIGINT NOT NULL,
       user_id TEXT
-    )`);
-
-    await p.query(`CREATE TABLE IF NOT EXISTS otps (
+    )`,
+    `CREATE TABLE IF NOT EXISTS otps (
       identifier TEXT PRIMARY KEY,
       otp TEXT NOT NULL,
       expires BIGINT NOT NULL
-    )`);
-
-    await p.query(`CREATE TABLE IF NOT EXISTS admin_sessions (
+    )`,
+    `CREATE TABLE IF NOT EXISTS admin_sessions (
       token TEXT PRIMARY KEY,
       username TEXT NOT NULL
-    )`);
-
-    await p.query(`CREATE TABLE IF NOT EXISTS admins (
+    )`,
+    `CREATE TABLE IF NOT EXISTS admins (
       id TEXT PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'admin',
       created_at BIGINT NOT NULL
-    )`);
-
-    await p.query(`CREATE TABLE IF NOT EXISTS snapshots (
+    )`,
+    `CREATE TABLE IF NOT EXISTS snapshots (
       id TEXT PRIMARY KEY,
       data JSONB NOT NULL,
       updated_at TIMESTAMP DEFAULT NOW()
-    )`);
+    )`,
+  ];
 
-    // Indexes
-    await p.query(`CREATE INDEX IF NOT EXISTS idx_students_admission ON students(admission_number)`);
-    await p.query(`CREATE INDEX IF NOT EXISTS idx_students_department ON students(department)`);
-    await p.query(`CREATE INDEX IF NOT EXISTS idx_candidates_position ON candidates(position)`);
-    await p.query(`CREATE INDEX IF NOT EXISTS idx_votes_election ON votes(election_id)`);
-
-    console.log('Neon: all tables ready');
-    return true;
-  } catch (err) {
-    console.error('Neon init tables failed:', err);
-    return false;
+  for (const sql of tables) {
+    try {
+      await p.query(sql);
+    } catch (err) {
+      console.error('Neon table creation error:', sql.slice(0, 60) + '...', err);
+      allOk = false;
+    }
   }
+
+  // Indexes (best-effort)
+  const indexes = [
+    `CREATE INDEX IF NOT EXISTS idx_students_admission ON students(admission_number)`,
+    `CREATE INDEX IF NOT EXISTS idx_students_department ON students(department)`,
+    `CREATE INDEX IF NOT EXISTS idx_candidates_position ON candidates(position)`,
+    `CREATE INDEX IF NOT EXISTS idx_votes_election ON votes(election_id)`,
+  ];
+  for (const sql of indexes) {
+    try { await p.query(sql); } catch {}
+  }
+
+  if (allOk) {
+    console.log('Neon: all tables ready');
+  } else {
+    console.warn('Neon: some tables may not have been created (check errors above)');
+  }
+  return allOk;
 }
 
 // ========== SNAPSHOT (JSON blob persistence) ==========
