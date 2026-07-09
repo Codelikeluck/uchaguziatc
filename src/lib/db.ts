@@ -303,7 +303,9 @@ class Database {
 
   async addVote(vote: Vote): Promise<Vote> {
     await this.ensureInit();
+    console.log(`[db.addVote] storing hash=${vote.voteHash}, votes.size before=${this.votes.size}`);
     this.votes.set(vote.voteHash, vote);
+    console.log(`[db.addVote] votes.size after=${this.votes.size}`);
     this.persist();
     if (process.env.DATABASE_URL) neonAddVoteFn(vote);
     return vote;
@@ -311,7 +313,12 @@ class Database {
 
   async getVote(hash: string): Promise<Vote | undefined> {
     await this.ensureInit();
-    return this.votes.get(hash);
+    const result = this.votes.get(hash);
+    console.log(`[db.getVote] looking up hash=${hash}, found=${!!result}, total votes in map=${this.votes.size}`);
+    if (!result) {
+      console.log(`[db.getVote] all keys:`, Array.from(this.votes.keys()));
+    }
+    return result;
   }
 
   async getAllVotes(): Promise<Vote[]> {
