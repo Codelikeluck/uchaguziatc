@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --foreground-rgb: 15, 23, 42;
+  --background-rgb: 248, 250, 252;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+@layer components {
+  .atc-card {
+    @apply bg-white rounded-xl shadow-lg border border-slate-200 p-6;
+  }
+
+  .atc-btn-primary {
+    @apply bg-atc-primary hover:bg-blue-800 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg;
+  }
+
+  .atc-btn-secondary {
+    @apply bg-atc-secondary hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg;
+  }
+
+  .atc-btn-outline {
+    @apply border-2 border-atc-primary text-atc-primary hover:bg-atc-primary hover:text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200;
+  }
+
+  .atc-input {
+    @apply w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-atc-primary focus:ring-2 focus:ring-blue-200 outline-none transition-all;
+  }
+
+  .atc-badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
+  }
+
+  .blockchain-glow {
+    box-shadow: 0 0 20px rgba(30, 64, 175, 0.15);
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
