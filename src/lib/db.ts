@@ -1,5 +1,17 @@
 import { Student, Candidate, Election, Vote, Block, AuditEvent } from '@/types';
 import { sha256 } from './crypto';
+import { saveData, loadData } from './persist';
+
+interface DbSnapshot {
+  students: [string, Student][];
+  candidates: [string, Candidate][];
+  elections: [string, Election][];
+  votes: [string, Vote][];
+  blocks: Block[];
+  auditEvents: AuditEvent[];
+  otps: [string, { otp: string; expires: number }][];
+  adminSessions: [string, { username: string; expires: number }][];
+}
 
 class Database {
   private students: Map<string, Student> = new Map();
@@ -10,27 +22,73 @@ class Database {
   private auditEvents: AuditEvent[] = [];
   private otps: Map<string, { otp: string; expires: number }> = new Map();
   private adminSessions: Map<string, { username: string; expires: number }> = new Map();
-
-  private seeded = false;
+  private savePending = false;
 
   constructor() {
-    this.seedData();
+    this.load().then(loaded => {
+      if (!loaded) this.seedData();
+    });
+  }
+
+  private async load(): Promise<boolean> {
+    try {
+      const data = await loadData();
+      if (!data) return false;
+
+      this.students = new Map(data.students || []);
+      this.candidates = new Map(data.candidates || []);
+      this.elections = new Map(data.elections || []);
+      this.votes = new Map(data.votes || []);
+      this.blocks = data.blocks || [];
+
+      this.auditEvents = (data.auditEvents || []).filter((e: any) => {
+        if (e.expires && Date.now() > e.expires) return false;
+        return true;
+      });
+
+      this.otps = new Map((data.otps || []).filter(([, v]: any) => Date.now() <= v.expires));
+      this.adminSessions = new Map((data.adminSessions || []).filter(([, v]: any) => Date.now() <= v.expires));
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async persist(): Promise<void> {
+    if (this.savePending) return;
+    this.savePending = true;
+    try {
+      const snapshot: DbSnapshot = {
+        students: Array.from(this.students.entries()),
+        candidates: Array.from(this.candidates.entries()),
+        elections: Array.from(this.elections.entries()),
+        votes: Array.from(this.votes.entries()),
+        blocks: this.blocks,
+        auditEvents: this.auditEvents,
+        otps: Array.from(this.otps.entries()),
+        adminSessions: Array.from(this.adminSessions.entries()),
+      };
+      await saveData(snapshot as any);
+    } catch (err) {
+      console.error('Persist failed:', err);
+    } finally {
+      this.savePending = false;
+    }
   }
 
   private seedData() {
-    if (this.seeded) return;
-    this.seeded = true;
-    const positions = [
-      { id: 'pos_1', title: 'President', description: 'Head of SOATECO' },
-      { id: 'pos_2', title: 'Vice President', description: 'Deputy head' },
-      { id: 'pos_3', title: 'Secretary General', description: 'Administrative head' },
-      { id: 'pos_4', title: 'Treasurer', description: 'Financial oversight' },
-    ];
+    if (this.students.size > 0 || this.candidates.size > 0) return;
 
     const election: Election = {
       id: 'election_2024',
       title: 'SOATECO General Elections 2024',
-      positions: positions.map(p => ({ ...p, candidates: [] })),
+      positions: [
+        { id: 'pos_1', title: 'President', description: 'Head of SOATECO', candidates: [] },
+        { id: 'pos_2', title: 'Vice President', description: 'Deputy head', candidates: [] },
+        { id: 'pos_3', title: 'Secretary General', description: 'Administrative head', candidates: [] },
+        { id: 'pos_4', title: 'Treasurer', description: 'Financial oversight', candidates: [] },
+      ],
       startDate: new Date().toISOString(),
       endDate: new Date(Date.now() + 72 * 3600 * 1000).toISOString(),
       status: 'active',
@@ -53,6 +111,7 @@ class Database {
       { id: 'cand_3', studentId: 'stud_4', name: 'Amina Juma', position: 'Vice President', manifesto: 'Unity and diversity in student leadership.', imageUrl: 'https://ui-avatars.com/api/?name=Amina+Juma&background=d97706&color=fff&size=200', documents: [], gpa: 3.7, yearOfStudy: 4, status: 'approved' as const, votes: 0 },
     ];
     sampleCandidates.forEach(c => this.candidates.set(c.id, c));
+    this.persist();
   }
 
   getStudentByAdmission(admissionNumber: string): Student | undefined {
@@ -68,16 +127,20 @@ class Database {
     if (!student) return undefined;
     const updated = { ...student, ...data };
     this.students.set(id, updated);
+    this.persist();
     return updated;
   }
 
   addStudent(student: Student): Student {
     this.students.set(student.id, student);
+    this.persist();
     return student;
   }
 
   deleteStudent(id: string): boolean {
-    return this.students.delete(id);
+    const result = this.students.delete(id);
+    if (result) this.persist();
+    return result;
   }
 
   getAllStudents(): Student[] {
@@ -86,6 +149,7 @@ class Database {
 
   addCandidate(candidate: Candidate): Candidate {
     this.candidates.set(candidate.id, candidate);
+    this.persist();
     return candidate;
   }
 
@@ -106,11 +170,14 @@ class Database {
     if (!candidate) return undefined;
     const updated = { ...candidate, ...data };
     this.candidates.set(id, updated);
+    this.persist();
     return updated;
   }
 
   deleteCandidate(id: string): boolean {
-    return this.candidates.delete(id);
+    const result = this.candidates.delete(id);
+    if (result) this.persist();
+    return result;
   }
 
   getElection(id: string): Election | undefined {
@@ -126,7 +193,14 @@ class Database {
     if (!election) return undefined;
     const updated = { ...election, ...data };
     this.elections.set(id, updated);
+    this.persist();
     return updated;
+  }
+
+  addElection(election: Election): Election {
+    this.elections.set(election.id, election);
+    this.persist();
+    return election;
   }
 
   getAllElections(): Election[] {
@@ -134,7 +208,9 @@ class Database {
   }
 
   deleteElection(id: string): boolean {
-    return this.elections.delete(id);
+    const result = this.elections.delete(id);
+    if (result) this.persist();
+    return result;
   }
 
   getStudentsByDepartment(department: string): Student[] {
@@ -150,11 +226,13 @@ class Database {
     for (const id of ids) {
       if (this.students.delete(id)) count++;
     }
+    if (count > 0) this.persist();
     return count;
   }
 
   addVote(vote: Vote): Vote {
     this.votes.set(vote.voteHash, vote);
+    this.persist();
     return vote;
   }
 
@@ -168,6 +246,7 @@ class Database {
 
   addBlock(block: Block): Block {
     this.blocks.push(block);
+    this.persist();
     return block;
   }
 
@@ -185,6 +264,7 @@ class Database {
 
   storeOTP(identifier: string, otp: string, ttlMinutes: number = 10): void {
     this.otps.set(identifier, { otp, expires: Date.now() + ttlMinutes * 60000 });
+    this.persist();
   }
 
   verifyOTP(identifier: string, otp: string): boolean {
@@ -192,15 +272,20 @@ class Database {
     if (!record) return false;
     if (Date.now() > record.expires) {
       this.otps.delete(identifier);
+      this.persist();
       return false;
     }
     const valid = record.otp === otp;
-    if (valid) this.otps.delete(identifier);
+    if (valid) {
+      this.otps.delete(identifier);
+      this.persist();
+    }
     return valid;
   }
 
   createAdminSession(token: string, username: string, ttlHours: number = 24): void {
     this.adminSessions.set(token, { username, expires: Date.now() + ttlHours * 3600000 });
+    this.persist();
   }
 
   verifyAdminSession(token: string): boolean {
@@ -208,6 +293,7 @@ class Database {
     if (!session) return false;
     if (Date.now() > session.expires) {
       this.adminSessions.delete(token);
+      this.persist();
       return false;
     }
     return true;
@@ -215,6 +301,7 @@ class Database {
 
   addAuditEvent(event: AuditEvent): void {
     this.auditEvents.push(event);
+    this.persist();
   }
 
   getAuditEvents(): AuditEvent[] {

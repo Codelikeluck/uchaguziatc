@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { 
   ArrowLeft, Shield, Users, BarChart3, Blocks, AlertCircle, 
@@ -78,6 +78,9 @@ export default function AdminPage() {
   const [bulkResult, setBulkResult] = useState<{ added: number; errors?: string[] } | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const bulkFileRef = useRef<HTMLInputElement>(null);
+
+  // Student edit state
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
   // Student filter & bulk delete state
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
@@ -1071,37 +1074,113 @@ export default function AdminPage() {
                 </thead>
                 <tbody>
                   {filteredStudents.map(student => (
-                    <tr key={student.id} className={`border-b border-slate-100 hover:bg-slate-50 ${selectedStudents.has(student.id) ? 'bg-blue-50' : ''}`}>
-                      <td className="py-3 px-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedStudents.has(student.id)}
-                          onChange={() => {
-                            const next = new Set(selectedStudents);
-                            if (next.has(student.id)) next.delete(student.id);
-                            else next.add(student.id);
-                            setSelectedStudents(next);
-                          }}
-                          className="accent-atc-primary"
-                        />
-                      </td>
-                      <td className="py-3 px-4 font-mono text-xs">{student.admissionNumber}</td>
-                      <td className="py-3 px-4 font-medium">{student.name}</td>
-                      <td className="py-3 px-4">{student.department}</td>
-                      <td className="py-3 px-4">Year {student.yearOfStudy}</td>
-                      <td className="py-3 px-4">
-                        {student.hasVoted ? (
-                          <span className="atc-badge bg-emerald-100 text-emerald-700 text-xs"><CheckCircle className="w-3 h-3 mr-1" /> Yes</span>
-                        ) : (
-                          <span className="atc-badge bg-slate-100 text-slate-600 text-xs">No</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <button onClick={() => deleteStudent(student.id)} className="text-red-500 hover:text-red-700 transition-colors">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
+                    <React.Fragment key={student.id}>
+                      <tr className={`border-b border-slate-100 hover:bg-slate-50 ${selectedStudents.has(student.id) ? 'bg-blue-50' : ''}`}>
+                        <td className="py-3 px-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedStudents.has(student.id)}
+                            onChange={() => {
+                              const next = new Set(selectedStudents);
+                              if (next.has(student.id)) next.delete(student.id);
+                              else next.add(student.id);
+                              setSelectedStudents(next);
+                            }}
+                            className="accent-atc-primary"
+                          />
+                        </td>
+                        <td className="py-3 px-4 font-mono text-xs">{student.admissionNumber}</td>
+                        <td className="py-3 px-4 font-medium">{student.name}</td>
+                        <td className="py-3 px-4">{student.department}</td>
+                        <td className="py-3 px-4">Year {student.yearOfStudy}</td>
+                        <td className="py-3 px-4">
+                          {student.hasVoted ? (
+                            <span className="atc-badge bg-emerald-100 text-emerald-700 text-xs"><CheckCircle className="w-3 h-3 mr-1" /> Yes</span>
+                          ) : (
+                            <span className="atc-badge bg-slate-100 text-slate-600 text-xs">No</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => setEditingStudent(student)} className="text-slate-400 hover:text-atc-primary transition-colors">
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => deleteStudent(student.id)} className="text-red-400 hover:text-red-600 transition-colors">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {editingStudent?.id === student.id && (
+                        <tr className="bg-blue-50">
+                          <td colSpan={7} className="py-4 px-4">
+                            <div className="grid md:grid-cols-4 gap-3 mb-3">
+                              <div>
+                                <label className="text-xs text-slate-500">Name</label>
+                                <input type="text" value={editingStudent.name}
+                                  onChange={e => setEditingStudent({...editingStudent, name: e.target.value})}
+                                  className="atc-input text-sm py-2" />
+                              </div>
+                              <div>
+                                <label className="text-xs text-slate-500">Email</label>
+                                <input type="email" value={editingStudent.email}
+                                  onChange={e => setEditingStudent({...editingStudent, email: e.target.value})}
+                                  className="atc-input text-sm py-2" />
+                              </div>
+                              <div>
+                                <label className="text-xs text-slate-500">Department</label>
+                                <select value={editingStudent.department}
+                                  onChange={e => setEditingStudent({...editingStudent, department: e.target.value})}
+                                  className="atc-input text-sm py-2">
+                                  <option value="Computer Science">Computer Science</option>
+                                  <option value="ICT">ICT</option>
+                                  <option value="Electrical">Electrical</option>
+                                  <option value="Civil Engineering">Civil Engineering</option>
+                                  <option value="Mechanical">Mechanical</option>
+                                  <option value="Business">Business</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-xs text-slate-500">Year</label>
+                                <input type="number" min="1" max="5" value={editingStudent.yearOfStudy}
+                                  onChange={e => setEditingStudent({...editingStudent, yearOfStudy: parseInt(e.target.value) || 1})}
+                                  className="atc-input text-sm py-2" />
+                              </div>
+                              <div>
+                                <label className="text-xs text-slate-500">Phone</label>
+                                <input type="tel" value={editingStudent.phone || ''}
+                                  onChange={e => setEditingStudent({...editingStudent, phone: e.target.value})}
+                                  className="atc-input text-sm py-2" placeholder="+255..." />
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch('/api/students', {
+                                      method: 'PUT',
+                                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                      body: JSON.stringify(editingStudent),
+                                    });
+                                    const data = await res.json();
+                                    if (data.success) {
+                                      setStudents(students.map(s => s.id === editingStudent.id ? data.student : s));
+                                      setEditingStudent(null);
+                                    } else {
+                                      setError(data.error);
+                                    }
+                                  } catch (e) { console.error('Edit student error:', e); }
+                                }}
+                                className="atc-btn-primary text-xs py-1.5 px-3 inline-flex items-center gap-1"
+                              >
+                                <CheckCircle className="w-3 h-3" /> Save
+                              </button>
+                              <button onClick={() => setEditingStudent(null)} className="atc-btn-outline text-xs py-1.5 px-3">Cancel</button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
