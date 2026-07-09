@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'fs';
 import path from 'path';
 import { kvSet, kvGet } from './kv';
-import { neonSaveSnapshot, neonLoadSnapshot, neonInitTables } from './neon';
+import { neonSaveSnapshot, neonLoadSnapshot, neonInitTables, neonSyncAll } from './neon';
 
 const DATA_DIR = process.env.VERCEL
   ? '/tmp/data'
@@ -28,7 +28,10 @@ export async function loadData(): Promise<Record<string, any> | null> {
     }
     if (neonInited) {
       const neonData = await neonLoadSnapshot();
-      if (neonData) return neonData;
+      if (neonData) {
+        neonSyncAll(neonData);
+        return neonData;
+      }
     }
   }
 
@@ -45,7 +48,10 @@ export async function saveData(data: Record<string, any>): Promise<void> {
     }
     if (neonInited) {
       const neonOk = await neonSaveSnapshot(data);
-      if (neonOk) return;
+      if (neonOk) {
+        neonSyncAll(data);
+        return;
+      }
     }
   }
 

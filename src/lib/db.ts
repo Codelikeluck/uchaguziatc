@@ -2,6 +2,7 @@ import { Student, Candidate, Election, Vote, Block, AuditEvent } from '@/types';
 import { sha256 } from './crypto';
 import { saveData, loadData, loadDataSync } from './persist';
 import { kvSet, kvGet, kvDel } from './kv';
+import { neonAddStudent, neonDeleteStudent, neonDeleteStudents, neonUpdateStudent, neonAddCandidate as neonAddCandidateFn, neonDeleteCandidate as neonDeleteCandidateFn, neonUpdateCandidate as neonUpdateCandidateFn, neonSaveElection as neonSaveElectionFn, neonDeleteElection as neonDeleteElectionFn, neonAddVote as neonAddVoteFn, neonAddBlock as neonAddBlockFn } from './neon';
 
 interface AdminAccount {
   id: string;
@@ -153,18 +154,23 @@ class Database {
     const updated = { ...student, ...data };
     this.students.set(id, updated);
     this.persist();
+    if (process.env.DATABASE_URL) neonUpdateStudent(id, data);
     return updated;
   }
 
   addStudent(student: Student): Student {
     this.students.set(student.id, student);
     this.persist();
+    if (process.env.DATABASE_URL) neonAddStudent(student);
     return student;
   }
 
   deleteStudent(id: string): boolean {
     const result = this.students.delete(id);
-    if (result) this.persist();
+    if (result) {
+      this.persist();
+      if (process.env.DATABASE_URL) neonDeleteStudent(id);
+    }
     return result;
   }
 
@@ -175,6 +181,7 @@ class Database {
   addCandidate(candidate: Candidate): Candidate {
     this.candidates.set(candidate.id, candidate);
     this.persist();
+    if (process.env.DATABASE_URL) neonAddCandidateFn(candidate);
     return candidate;
   }
 
@@ -196,12 +203,16 @@ class Database {
     const updated = { ...candidate, ...data };
     this.candidates.set(id, updated);
     this.persist();
+    if (process.env.DATABASE_URL) neonUpdateCandidateFn(id, data);
     return updated;
   }
 
   deleteCandidate(id: string): boolean {
     const result = this.candidates.delete(id);
-    if (result) this.persist();
+    if (result) {
+      this.persist();
+      if (process.env.DATABASE_URL) neonDeleteCandidateFn(id);
+    }
     return result;
   }
 
@@ -219,12 +230,14 @@ class Database {
     const updated = { ...election, ...data };
     this.elections.set(id, updated);
     this.persist();
+    if (process.env.DATABASE_URL) neonSaveElectionFn(updated);
     return updated;
   }
 
   addElection(election: Election): Election {
     this.elections.set(election.id, election);
     this.persist();
+    if (process.env.DATABASE_URL) neonSaveElectionFn(election);
     return election;
   }
 
@@ -234,7 +247,10 @@ class Database {
 
   deleteElection(id: string): boolean {
     const result = this.elections.delete(id);
-    if (result) this.persist();
+    if (result) {
+      this.persist();
+      if (process.env.DATABASE_URL) neonDeleteElectionFn(id);
+    }
     return result;
   }
 
@@ -251,13 +267,17 @@ class Database {
     for (const id of ids) {
       if (this.students.delete(id)) count++;
     }
-    if (count > 0) this.persist();
+    if (count > 0) {
+      this.persist();
+      if (process.env.DATABASE_URL) neonDeleteStudents(ids);
+    }
     return count;
   }
 
   addVote(vote: Vote): Vote {
     this.votes.set(vote.voteHash, vote);
     this.persist();
+    if (process.env.DATABASE_URL) neonAddVoteFn(vote);
     return vote;
   }
 
@@ -272,6 +292,7 @@ class Database {
   addBlock(block: Block): Block {
     this.blocks.push(block);
     this.persist();
+    if (process.env.DATABASE_URL) neonAddBlockFn(block);
     return block;
   }
 
