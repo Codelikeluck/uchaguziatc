@@ -40,6 +40,8 @@ class Database {
     const data = loadDataSync();
     if (data) {
       this.loadFromData(data);
+    } else {
+      this.seedData();
     }
     this.syncFromKV();
   }
@@ -66,6 +68,7 @@ class Database {
       const data = await loadData();
       if (data) {
         this.loadFromData(data);
+        this.persist();
       } else if (this.students.size === 0) {
         this.seedData();
       }
