@@ -40,8 +40,6 @@ class Database {
     const data = loadDataSync();
     if (data) {
       this.loadFromData(data);
-    } else {
-      this.seedData();
     }
     this.syncFromKV();
   }

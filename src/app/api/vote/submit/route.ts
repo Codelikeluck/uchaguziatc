@@ -4,11 +4,9 @@ import { blockchain } from '@/lib/mockBlockchain';
 import { encryptVote, generateZKProof, generateVoteHash, sha256 } from '@/lib/crypto';
 import { jwtVerify } from 'jose';
 
-function getJwtSecret(): Uint8Array {
+function getJwtSecret(): Uint8Array | null {
   const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error('JWT_SECRET environment variable is required');
-  }
+  if (!secret) return null;
   return new TextEncoder().encode(secret);
 }
 
@@ -20,7 +18,11 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.split(' ')[1];
-    const { payload } = await jwtVerify(token, getJwtSecret(), { clockTolerance: 60 });
+    const secret = getJwtSecret();
+    if (!secret) {
+      return NextResponse.json({ error: 'Server misconfigured: JWT_SECRET not set' }, { status: 500 });
+    }
+    const { payload } = await jwtVerify(token, secret, { clockTolerance: 60 });
     const studentId = payload.sub as string;
 
     const student = db.getStudent(studentId);

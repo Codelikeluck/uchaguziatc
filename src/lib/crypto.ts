@@ -6,8 +6,8 @@ const AES_IV_HEX = process.env.AES_IV;
 function getAesKey(): Buffer {
   const hex = AES_KEY_HEX;
   if (!hex || hex.length < 64) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('AES_KEY env var required (64 hex chars = 32 bytes)');
+    if (!hex && process.env.NODE_ENV === 'production') {
+      console.warn('AES_KEY not set — vote encryption uses dev fallback. Set AES_KEY (64 hex chars) in production.');
     }
     return Buffer.from('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'hex');
   }

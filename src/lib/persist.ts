@@ -42,6 +42,8 @@ export async function loadData(): Promise<Record<string, any> | null> {
 }
 
 export async function saveData(data: Record<string, any>): Promise<void> {
+  let savedToNeon = false;
+
   if (process.env.DATABASE_URL) {
     if (!neonInited) {
       neonInited = await neonInitTables();
@@ -50,13 +52,12 @@ export async function saveData(data: Record<string, any>): Promise<void> {
       const neonOk = await neonSaveSnapshot(data);
       if (neonOk) {
         neonSyncAll(data);
-        return;
+        savedToNeon = true;
       }
     }
   }
 
   const kvOk = await kvSet(KV_KEY, data);
-  if (kvOk) return;
 
   try {
     mkdirSync(DATA_DIR, { recursive: true });
@@ -65,5 +66,9 @@ export async function saveData(data: Record<string, any>): Promise<void> {
     renameSync(tmpPath, DATA_FILE);
   } catch (err) {
     console.error('File fallback write failed:', err);
+  }
+
+  if (!savedToNeon && !kvOk) {
+    console.warn('saveData: all remote backends failed, data only on local file');
   }
 }
