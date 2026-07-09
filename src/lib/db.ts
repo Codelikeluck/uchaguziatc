@@ -67,9 +67,14 @@ class Database {
     try {
       const data = await loadData();
       if (data) {
-        console.log(`syncFromKV: loaded data with ${data.students?.length || 0} students, ${data.candidates?.length || 0} candidates`);
-        this.loadFromData(data);
-        this.persist();
+        const remoteCount = data.students?.length || 0;
+        const localCount = this.students.size;
+        if (remoteCount > localCount || localCount === 0) {
+          console.log(`syncFromKV: loading from remote (remote=${remoteCount}, local=${localCount})`);
+          this.loadFromData(data);
+        } else {
+          console.log(`syncFromKV: keeping local (remote=${remoteCount}, local=${localCount})`);
+        }
       } else if (this.students.size === 0) {
         console.log('syncFromKV: no data found in any backend, seeding');
         this.seedData();
