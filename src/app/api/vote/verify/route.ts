@@ -12,8 +12,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Vote hash required' }, { status: 400 });
     }
 
+    console.log(`[verify] looking up vote hash: ${voteHash} (length=${voteHash.length})`);
     const vote = await db.getVote(voteHash);
+    console.log(`[verify] vote found:`, !!vote);
     if (!vote) {
+      const allVotes = await db.getAllVotes();
+      console.log(`[verify] all vote hashes in memory:`, allVotes.map(v => v.voteHash));
       return NextResponse.json({ error: 'Vote not found' }, { status: 404 });
     }
 

@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
 
     const timestamp = Date.now();
     const voteHash = generateVoteHash(studentId, candidateId, timestamp);
+    console.log(`[submit] generated voteHash=${voteHash} for student=${studentId} candidate=${candidateId}`);
     const voterSecret = sha256(student.admissionNumber + timestamp.toString());
     const { encrypted, ipfsHash } = encryptVote(candidateId, voterSecret);
     const zkProof = generateZKProof(encrypted, candidateId);
