@@ -24,11 +24,12 @@ export function loadDataSync(): Record<string, any> | null {
 export async function loadData(): Promise<Record<string, any> | null> {
   if (process.env.DATABASE_URL) {
     if (!neonInited) {
-      await neonInitTables();
-      neonInited = true;
+      neonInited = await neonInitTables();
     }
-    const neonData = await neonLoadSnapshot();
-    if (neonData) return neonData;
+    if (neonInited) {
+      const neonData = await neonLoadSnapshot();
+      if (neonData) return neonData;
+    }
   }
 
   const kvData = await kvGet<Record<string, any>>(KV_KEY);
@@ -40,11 +41,12 @@ export async function loadData(): Promise<Record<string, any> | null> {
 export async function saveData(data: Record<string, any>): Promise<void> {
   if (process.env.DATABASE_URL) {
     if (!neonInited) {
-      await neonInitTables();
-      neonInited = true;
+      neonInited = await neonInitTables();
     }
-    const neonOk = await neonSaveSnapshot(data);
-    if (neonOk) return;
+    if (neonInited) {
+      const neonOk = await neonSaveSnapshot(data);
+      if (neonOk) return;
+    }
   }
 
   const kvOk = await kvSet(KV_KEY, data);

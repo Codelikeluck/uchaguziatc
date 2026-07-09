@@ -1,7 +1,14 @@
 import nodemailer from 'nodemailer';
 
 function sanitizeHost(host: string): string {
-  return host.replace(/^(smtp:\/\/|http:\/\/|https:\/\/)/, '');
+  let h = host.trim();
+  h = h.replace(/^(?:https?:\/\/|smtps?:\/\/)/i, '');
+  h = h.replace(/^:\/\//, '');
+  h = h.replace(/\/.*$/, '');
+  h = h.replace(/:\d+$/, '');
+  // Collapse multiple dots
+  h = h.replace(/\.\.+/g, '.');
+  return h;
 }
 
 function getConfig(): { host: string; port: number; user: string; pass: string; from: string } | null {
@@ -32,7 +39,7 @@ export async function sendOTPEmail(
   });
 
   try {
-    const info = await transport.sendMail({
+    await transport.sendMail({
       from: config.from,
       to,
       subject: 'Your ATC Voting OTP Code',
@@ -64,7 +71,7 @@ export async function sendOTPEmail(
     return { sent: true, from: config.from, to };
   } catch (err: any) {
     const message = err?.message || String(err);
-    console.error('Email send failed:', message);
+    console.error(`Email send failed. host=${config.host} port=${config.port} user=${config.user} from=${config.from} to=${to}:`, message);
     return { sent: false, error: message, from: config.from, to };
   }
 }

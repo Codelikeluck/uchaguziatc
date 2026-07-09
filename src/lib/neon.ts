@@ -30,12 +30,13 @@ export async function neonSaveSnapshot(data: Record<string, any>): Promise<boole
 
 export async function neonLoadSnapshot(): Promise<Record<string, any> | null> {
   const p = getPool();
-  if (!p) return null;
+  if (!p) { console.warn('Neon: no pool (DATABASE_URL not set or invalid)'); return null; }
   try {
     const { rows } = await p.query(`SELECT data FROM snapshots WHERE id = 'main'`);
     if (rows.length === 0) return null;
     return rows[0].data as Record<string, any>;
-  } catch {
+  } catch (err) {
+    console.error('Neon load snapshot failed:', err);
     return null;
   }
 }
@@ -58,7 +59,7 @@ export async function neonGetAllStudents(): Promise<any[]> {
       hasVoted: r.has_voted,
       walletAddress: r.wallet_address,
     }));
-  } catch { return []; }
+  } catch (err) { console.error('Neon getAllStudents failed:', err); return []; }
 }
 
 export async function neonGetStudentByAdmission(admissionNumber: string): Promise<any | null> {
@@ -73,7 +74,7 @@ export async function neonGetStudentByAdmission(admissionNumber: string): Promis
       department: r.department, yearOfStudy: r.year_of_study, phone: r.phone,
       hasVoted: r.has_voted, walletAddress: r.wallet_address,
     };
-  } catch { return null; }
+  } catch (err) { console.error('Neon getStudentByAdmission failed:', err); return null; }
 }
 
 export async function neonAddStudent(student: any): Promise<boolean> {
@@ -130,7 +131,7 @@ export async function neonDeleteStudent(id: string): Promise<boolean> {
   try {
     await p.query(`DELETE FROM students WHERE id = $1`, [id]);
     return true;
-  } catch { return false; }
+  } catch (err) { console.error('Neon delete student failed:', err); return false; }
 }
 
 export async function neonDeleteStudents(ids: string[]): Promise<number> {
@@ -141,7 +142,7 @@ export async function neonDeleteStudents(ids: string[]): Promise<number> {
     const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
     const { rowCount } = await p.query(`DELETE FROM students WHERE id IN (${placeholders})`, ids);
     return rowCount || 0;
-  } catch { return 0; }
+  } catch (err) { console.error('Neon deleteStudents failed:', err); return 0; }
 }
 
 export async function neonBulkAddStudents(students: any[]): Promise<number> {
@@ -156,9 +157,10 @@ export async function neonBulkAddStudents(students: any[]): Promise<number> {
 
 export async function neonInitTables(): Promise<boolean> {
   const p = getPool();
-  if (!p) return false;
+  if (!p) { console.warn('Neon initTables: DATABASE_URL not set, skipping'); return false; }
   try {
     await p.query(`CREATE TABLE IF NOT EXISTS snapshots (id TEXT PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMP DEFAULT NOW())`);
+    console.log('Neon: snapshots table ready');
     return true;
   } catch (err) {
     console.error('Neon init tables failed:', err);
