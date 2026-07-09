@@ -2,7 +2,7 @@ import { Student, Candidate, Election, Vote, Block, AuditEvent } from '@/types';
 import { sha256 } from './crypto';
 import { saveData, loadData, loadDataSync } from './persist';
 import { kvSet, kvGet, kvDel } from './kv';
-import { neonAddStudent, neonDeleteStudent, neonDeleteStudents, neonUpdateStudent, neonAddCandidate as neonAddCandidateFn, neonDeleteCandidate as neonDeleteCandidateFn, neonUpdateCandidate as neonUpdateCandidateFn, neonSaveElection as neonSaveElectionFn, neonDeleteElection as neonDeleteElectionFn, neonAddVote as neonAddVoteFn, neonAddBlock as neonAddBlockFn } from './neon';
+import { neonAddStudent, neonDeleteStudent, neonDeleteStudents, neonUpdateStudent, neonAddCandidate as neonAddCandidateFn, neonDeleteCandidate as neonDeleteCandidateFn, neonUpdateCandidate as neonUpdateCandidateFn, neonSaveElection as neonSaveElectionFn, neonDeleteElection as neonDeleteElectionFn, neonAddVote as neonAddVoteFn, neonAddBlock as neonAddBlockFn, neonAddAdmin as neonAddAdminFn, neonDeleteAdmin as neonDeleteAdminFn } from './neon';
 
 interface AdminAccount {
   id: string;
@@ -67,10 +67,14 @@ class Database {
     try {
       const data = await loadData();
       if (data) {
+        console.log(`syncFromKV: loaded data with ${data.students?.length || 0} students, ${data.candidates?.length || 0} candidates`);
         this.loadFromData(data);
         this.persist();
       } else if (this.students.size === 0) {
+        console.log('syncFromKV: no data found in any backend, seeding');
         this.seedData();
+      } else {
+        console.log(`syncFromKV: no remote data, keeping ${this.students.size} students from sync source`);
       }
     } catch (err) {
       console.error('KV sync failed (non-fatal):', err);
@@ -372,6 +376,7 @@ class Database {
   addAdmin(admin: AdminAccount): void {
     this.admins.set(admin.id, admin);
     this.persist();
+    if (process.env.DATABASE_URL) neonAddAdminFn(admin);
   }
 
   getAllAdmins(): AdminAccount[] {
@@ -381,7 +386,10 @@ class Database {
   deleteAdmin(id: string): boolean {
     if (this.admins.get(id)?.role === 'superadmin') return false;
     const result = this.admins.delete(id);
-    if (result) this.persist();
+    if (result) {
+      this.persist();
+      if (process.env.DATABASE_URL) neonDeleteAdminFn(id);
+    }
     return result;
   }
 

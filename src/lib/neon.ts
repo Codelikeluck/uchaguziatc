@@ -513,6 +513,35 @@ export async function neonAddVote(vote: any): Promise<boolean> {
 
 // ========== BLOCKS ==========
 
+// ========== ADMINS ==========
+
+export async function neonAddAdmin(admin: any): Promise<boolean> {
+  const p = getPool();
+  if (!p) return false;
+  try {
+    await p.query(
+      `INSERT INTO admins (id, username, password_hash, role, created_at)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (id) DO UPDATE SET
+         username = EXCLUDED.username, password_hash = EXCLUDED.password_hash,
+         role = EXCLUDED.role, created_at = EXCLUDED.created_at`,
+      [admin.id, admin.username, admin.passwordHash, admin.role || 'admin', admin.createdAt || Date.now()]
+    );
+    return true;
+  } catch (err) { console.error('Neon add admin failed:', err); return false; }
+}
+
+export async function neonDeleteAdmin(id: string): Promise<boolean> {
+  const p = getPool();
+  if (!p) return false;
+  try {
+    await p.query(`DELETE FROM admins WHERE id = $1`, [id]);
+    return true;
+  } catch (err) { console.error('Neon delete admin failed:', err); return false; }
+}
+
+// ========== BLOCKS ==========
+
 export async function neonAddBlock(block: any): Promise<boolean> {
   const p = getPool();
   if (!p) return false;
