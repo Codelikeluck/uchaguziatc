@@ -55,7 +55,7 @@ class Database {
     }
     if (this.students.size === 0) {
       console.log('_init: no data found, seeding');
-      this.seedData();
+      await this.seedData();
     }
     this.initialized = true;
     console.log('_init: complete');
@@ -100,7 +100,7 @@ class Database {
     await this.persistQueue;
   }
 
-  private seedData() {
+  private async seedData() {
     if (this.students.size > 0 || this.candidates.size > 0) return;
 
     const election: Election = {
@@ -145,7 +145,7 @@ class Database {
       createdAt: Date.now(),
     };
     this.admins.set(defaultAdmin.id, defaultAdmin);
-    this.persist();
+    await this.persist();
   }
 
   async getStudentByAdmission(admissionNumber: string): Promise<Student | undefined> {
@@ -164,7 +164,7 @@ class Database {
     if (!student) return undefined;
     const updated = { ...student, ...data };
     this.students.set(id, updated);
-    this.persist();
+    await this.persist();
     if (process.env.DATABASE_URL) neonUpdateStudent(id, data);
     return updated;
   }
@@ -172,7 +172,7 @@ class Database {
   async addStudent(student: Student): Promise<Student> {
     await this.ensureInit();
     this.students.set(student.id, student);
-    this.persist();
+    await this.persist();
     if (process.env.DATABASE_URL) neonAddStudent(student);
     return student;
   }
@@ -181,7 +181,7 @@ class Database {
     await this.ensureInit();
     const result = this.students.delete(id);
     if (result) {
-      this.persist();
+      await this.persist();
       if (process.env.DATABASE_URL) neonDeleteStudent(id);
     }
     return result;
@@ -195,7 +195,7 @@ class Database {
   async addCandidate(candidate: Candidate): Promise<Candidate> {
     await this.ensureInit();
     this.candidates.set(candidate.id, candidate);
-    this.persist();
+    await this.persist();
     if (process.env.DATABASE_URL) neonAddCandidateFn(candidate);
     return candidate;
   }
@@ -221,7 +221,7 @@ class Database {
     if (!candidate) return undefined;
     const updated = { ...candidate, ...data };
     this.candidates.set(id, updated);
-    this.persist();
+    await this.persist();
     if (process.env.DATABASE_URL) neonUpdateCandidateFn(id, data);
     return updated;
   }
@@ -230,7 +230,7 @@ class Database {
     await this.ensureInit();
     const result = this.candidates.delete(id);
     if (result) {
-      this.persist();
+      await this.persist();
       if (process.env.DATABASE_URL) neonDeleteCandidateFn(id);
     }
     return result;
@@ -252,7 +252,7 @@ class Database {
     if (!election) return undefined;
     const updated = { ...election, ...data };
     this.elections.set(id, updated);
-    this.persist();
+    await this.persist();
     if (process.env.DATABASE_URL) neonSaveElectionFn(updated);
     return updated;
   }
@@ -260,7 +260,7 @@ class Database {
   async addElection(election: Election): Promise<Election> {
     await this.ensureInit();
     this.elections.set(election.id, election);
-    this.persist();
+    await this.persist();
     if (process.env.DATABASE_URL) neonSaveElectionFn(election);
     return election;
   }
@@ -274,7 +274,7 @@ class Database {
     await this.ensureInit();
     const result = this.elections.delete(id);
     if (result) {
-      this.persist();
+      await this.persist();
       if (process.env.DATABASE_URL) neonDeleteElectionFn(id);
     }
     return result;
@@ -297,7 +297,7 @@ class Database {
       if (this.students.delete(id)) count++;
     }
     if (count > 0) {
-      this.persist();
+      await this.persist();
       if (process.env.DATABASE_URL) neonDeleteStudents(ids);
     }
     return count;
@@ -308,7 +308,7 @@ class Database {
     console.log(`[db.addVote] storing hash=${vote.voteHash}, votes.size before=${this.votes.size}`);
     this.votes.set(vote.voteHash, vote);
     console.log(`[db.addVote] votes.size after=${this.votes.size}`);
-    this.persist();
+    await this.persist();
     if (process.env.DATABASE_URL) neonAddVoteFn(vote);
     return vote;
   }
@@ -331,7 +331,7 @@ class Database {
   async addBlock(block: Block): Promise<Block> {
     await this.ensureInit();
     this.blocks.push(block);
-    this.persist();
+    await this.persist();
     if (process.env.DATABASE_URL) neonAddBlockFn(block);
     return block;
   }
