@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       const admin = db.verifyAdminLogin(username, password);
       if (admin) {
         const sessionToken = uuidv4();
-        db.createAdminSession(sessionToken, username);
+        await db.createAdminSession(sessionToken, username);
         return NextResponse.json({ success: true, token: sessionToken, admin: { id: admin.id, username: admin.username, role: admin.role } });
       }
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'logout') {
-      if (token) db.deleteAdminSession(token);
+      if (token) await db.deleteAdminSession(token);
       return NextResponse.json({ success: true });
     }
 

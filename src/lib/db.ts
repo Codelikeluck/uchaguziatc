@@ -1,6 +1,7 @@
 import { Student, Candidate, Election, Vote, Block, AuditEvent } from '@/types';
 import { sha256 } from './crypto';
 import { saveData, loadData, loadDataSync } from './persist';
+import { kvSet, kvGet, kvDel } from './kv';
 
 interface AdminAccount {
   id: string;
@@ -307,29 +308,36 @@ class Database {
     return valid;
   }
 
-  createAdminSession(token: string, username: string): void {
+  async createAdminSession(token: string, username: string): Promise<void> {
     this.adminSessions.set(token, { username });
-    this.persist();
+    await kvSet(`session:${token}`, { username });
+    await this.persist();
   }
 
-  deleteAdminSession(token: string): void {
+  async deleteAdminSession(token: string): Promise<void> {
     this.adminSessions.delete(token);
-    this.persist();
+    await kvDel(`session:${token}`);
+    await this.persist();
   }
 
   async verifyAdminSession(token: string): Promise<boolean> {
-    let session = this.adminSessions.get(token);
-    if (!session) {
-      const snapshot = await loadData();
-      if (snapshot?.adminSessions) {
-        const found = (snapshot.adminSessions as [string, { username: string }][]).find(([t]) => t === token);
-        if (found) {
-          session = found[1];
-          this.adminSessions.set(token, session);
-        }
+    if (this.adminSessions.has(token)) return true;
+
+    const kvSession = await kvGet<{ username: string }>(`session:${token}`);
+    if (kvSession) {
+      this.adminSessions.set(token, kvSession);
+      return true;
+    }
+
+    const snapshot = await loadData();
+    if (snapshot?.adminSessions) {
+      const found = (snapshot.adminSessions as [string, { username: string }][]).find(([t]) => t === token);
+      if (found) {
+        this.adminSessions.set(token, found[1]);
+        return true;
       }
     }
-    return !!session;
+    return false;
   }
 
   verifyAdminLogin(username: string, password: string): AdminAccount | null {
