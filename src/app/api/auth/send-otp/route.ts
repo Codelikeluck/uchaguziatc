@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admission number required' }, { status: 400 });
     }
 
-    const student = db.getStudentByAdmission(admissionNumber);
+    const student = await db.getStudentByAdmission(admissionNumber);
     if (!student) {
       return NextResponse.json({
         error: 'Student not found. Please contact SOATECO admin to register.',
@@ -32,10 +32,10 @@ export async function POST(request: NextRequest) {
     if (kvStored) {
       await kvDel(`otp_inmem:${admissionNumber}`);
     } else {
-      db.storeOTP(admissionNumber, otp, 10);
+      await db.storeOTP(admissionNumber, otp, 10);
     }
 
-    blockchain.logAuditEvent('OTP_REQUESTED', sha256(admissionNumber), 'SYSTEM');
+    await blockchain.logAuditEvent('OTP_REQUESTED', sha256(admissionNumber), 'SYSTEM');
 
     let emailResult: { sent: boolean; error?: string; from?: string; to?: string } = { sent: false };
     if (student.email) {

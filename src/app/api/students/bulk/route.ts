@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const existing = db.getStudentByAdmission(studentData.admissionNumber);
+      const existing = await db.getStudentByAdmission(studentData.admissionNumber);
       if (existing) {
         errors.push(`Duplicate admission: ${studentData.admissionNumber}`);
         continue;
@@ -157,11 +157,11 @@ export async function POST(request: NextRequest) {
         walletAddress: '0x' + sha256(String(studentData.admissionNumber)).slice(0, 40),
       };
 
-      db.addStudent(student);
+      await db.addStudent(student);
       added.push(student);
     }
 
-    blockchain.logAuditEvent('BULK_STUDENTS_ADDED', sha256(added.length.toString()), 'ADMIN');
+    await blockchain.logAuditEvent('BULK_STUDENTS_ADDED', sha256(added.length.toString()), 'ADMIN');
 
     return NextResponse.json({
       success: true,

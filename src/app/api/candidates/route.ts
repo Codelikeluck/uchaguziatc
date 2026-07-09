@@ -7,7 +7,7 @@ import { blockchain } from '@/lib/mockBlockchain';
 async function checkAdmin(request: NextRequest): Promise<boolean> {
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) return false;
-  return db.verifyAdminSession(authHeader.split(' ')[1]);
+  return await db.verifyAdminSession(authHeader.split(' ')[1]);
 }
 
 export async function GET(request: NextRequest) {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const position = searchParams.get('position');
     const status = searchParams.get('status');
 
-    let candidates = db.getAllCandidates();
+    let candidates = await db.getAllCandidates();
 
     if (position) {
       candidates = candidates.filter(c => c.position === position);
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const data = await request.json();
 
     if (data.admissionNumber) {
-      const existing = db.getStudentByAdmission(data.admissionNumber);
+      const existing = await db.getStudentByAdmission(data.admissionNumber);
       if (existing) {
         data.studentId = existing.id;
       }
@@ -49,8 +49,8 @@ export async function POST(request: NextRequest) {
       status: data.status || 'pending',
       votes: data.votes || 0,
     };
-    db.addCandidate(candidate);
-    blockchain.logAuditEvent('CANDIDATE_REGISTERED', sha256(candidate.id), candidate.studentId || 'student');
+    await db.addCandidate(candidate);
+    await blockchain.logAuditEvent('CANDIDATE_REGISTERED', sha256(candidate.id), candidate.studentId || 'student');
     return NextResponse.json({ success: true, candidate }, { status: 201 });
   } catch (error) {
     console.error('Add candidate error:', error);
@@ -67,11 +67,11 @@ export async function PUT(request: NextRequest) {
     if (!id) {
       return NextResponse.json({ error: 'Candidate ID required' }, { status: 400 });
     }
-    const candidate = db.updateCandidate(id, updates);
+    const candidate = await db.updateCandidate(id, updates);
     if (!candidate) {
       return NextResponse.json({ error: 'Candidate not found' }, { status: 404 });
     }
-    blockchain.logAuditEvent('CANDIDATE_UPDATED', sha256(id), 'ADMIN');
+    await blockchain.logAuditEvent('CANDIDATE_UPDATED', sha256(id), 'ADMIN');
     return NextResponse.json({ success: true, candidate });
   } catch (error) {
     console.error('Update candidate error:', error);
@@ -89,10 +89,10 @@ export async function DELETE(request: NextRequest) {
     if (!id) {
       return NextResponse.json({ error: 'Candidate ID required' }, { status: 400 });
     }
-    if (!db.deleteCandidate(id)) {
+    if (!(await db.deleteCandidate(id))) {
       return NextResponse.json({ error: 'Candidate not found' }, { status: 404 });
     }
-    blockchain.logAuditEvent('CANDIDATE_DELETED', sha256(id), 'ADMIN');
+    await blockchain.logAuditEvent('CANDIDATE_DELETED', sha256(id), 'ADMIN');
     return NextResponse.json({ success: true, message: 'Candidate deleted' });
   } catch (error) {
     console.error('Delete candidate error:', error);

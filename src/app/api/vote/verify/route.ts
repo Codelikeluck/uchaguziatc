@@ -12,17 +12,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Vote hash required' }, { status: 400 });
     }
 
-    const vote = db.getVote(voteHash);
+    const vote = await db.getVote(voteHash);
     if (!vote) {
       return NextResponse.json({ error: 'Vote not found' }, { status: 404 });
     }
 
-    const inclusion = blockchain.verifyVoteInclusion(voteHash);
+    const inclusion = await blockchain.verifyVoteInclusion(voteHash);
     if (!inclusion) {
       return NextResponse.json({ error: 'Vote not found in blockchain' }, { status: 404 });
     }
 
-    const block = db.getBlockByIndex(inclusion.blockIndex);
+    const block = await db.getBlockByIndex(inclusion.blockIndex);
     if (!block) {
       return NextResponse.json({ error: 'Block not found' }, { status: 404 });
     }

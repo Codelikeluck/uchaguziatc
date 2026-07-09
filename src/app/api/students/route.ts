@@ -11,10 +11,10 @@ export async function GET(request: NextRequest) {
     const department = searchParams.get('department');
     const year = searchParams.get('year');
 
-    let students = db.getAllStudents();
+    let students = await db.getAllStudents();
 
     if (id) {
-      const student = db.getStudent(id);
+      const student = await db.getStudent(id);
       return student 
         ? NextResponse.json({ success: true, student })
         : NextResponse.json({ error: 'Student not found' }, { status: 404 });
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     const data = await request.json();
 
-    const existing = db.getStudentByAdmission(data.admissionNumber);
+    const existing = await db.getStudentByAdmission(data.admissionNumber);
     if (existing) {
       return NextResponse.json({ error: 'Student with this admission number already exists' }, { status: 409 });
     }
@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
       walletAddress: '0x' + sha256(data.admissionNumber).slice(0, 40),
     };
 
-    db.addStudent(student);
-    blockchain.logAuditEvent('STUDENT_REGISTERED', sha256(student.id), 'ADMIN');
+    await db.addStudent(student);
+    await blockchain.logAuditEvent('STUDENT_REGISTERED', sha256(student.id), 'ADMIN');
 
     return NextResponse.json({ success: true, student }, { status: 201 });
   } catch (error) {
@@ -82,13 +82,13 @@ export async function PUT(request: NextRequest) {
     }
 
     const { id, ...updates } = await request.json();
-    const student = db.updateStudent(id, updates);
+    const student = await db.updateStudent(id, updates);
 
     if (!student) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    blockchain.logAuditEvent('STUDENT_UPDATED', sha256(id), 'ADMIN');
+    await blockchain.logAuditEvent('STUDENT_UPDATED', sha256(id), 'ADMIN');
     return NextResponse.json({ success: true, student });
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -114,12 +114,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Student ID required' }, { status: 400 });
     }
 
-    const deleted = db.deleteStudent(id);
+    const deleted = await db.deleteStudent(id);
     if (!deleted) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    blockchain.logAuditEvent('STUDENT_DELETED', sha256(id), 'ADMIN');
+    await blockchain.logAuditEvent('STUDENT_DELETED', sha256(id), 'ADMIN');
 
     return NextResponse.json({ success: true, message: 'Student removed' });
   } catch (error) {

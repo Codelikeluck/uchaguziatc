@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     const { payload } = await jwtVerify(token, secret, { clockTolerance: 60 });
     const studentId = payload.sub as string;
 
-    const student = db.getStudent(studentId);
+    const student = await db.getStudent(studentId);
     if (!student) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
@@ -39,12 +39,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Candidate and election required' }, { status: 400 });
     }
 
-    const candidate = db.getCandidate(candidateId);
+    const candidate = await db.getCandidate(candidateId);
     if (!candidate || candidate.status !== 'approved') {
       return NextResponse.json({ error: 'Invalid candidate' }, { status: 400 });
     }
 
-    const election = db.getElection(electionId);
+    const election = await db.getElection(electionId);
     if (!election || election.status !== 'active') {
       return NextResponse.json({ error: 'Election not active' }, { status: 400 });
     }
@@ -60,21 +60,21 @@ export async function POST(request: NextRequest) {
       electionId,
       candidateId,
       timestamp,
-      blockIndex: blockchain.getLatestBlock()!.index + 1,
+      blockIndex: (await blockchain.getLatestBlock())!.index + 1,
       merkleProof: [],
       zkProof,
     };
 
-    const block = blockchain.addVoteTransaction(vote);
-    db.addVote(vote);
-    db.updateStudent(studentId, { hasVoted: true });
-    db.updateCandidate(candidateId, { votes: candidate.votes + 1 });
+    const block = await blockchain.addVoteTransaction(vote);
+    await db.addVote(vote);
+    await db.updateStudent(studentId, { hasVoted: true });
+    await db.updateCandidate(candidateId, { votes: candidate.votes + 1 });
 
-    const electionUpdated = db.getElection(electionId);
+    const electionUpdated = await db.getElection(electionId);
     if (electionUpdated) {
-      db.updateElection(electionId, { 
+      await db.updateElection(electionId, { 
         totalVotes: electionUpdated.totalVotes + 1,
-        totalVoters: db.getAllStudents().length 
+        totalVoters: (await db.getAllStudents()).length 
       });
     }
 

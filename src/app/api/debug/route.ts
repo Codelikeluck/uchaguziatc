@@ -15,12 +15,12 @@ export async function GET() {
       AES_KEY: process.env.AES_KEY?.length + ' chars' || 'NOT SET',
     },
     inMemory: {
-      students: db.getAllStudents().length,
-      candidates: db.getAllCandidates().length,
-      elections: db.getAllElections().length,
-      admins: db.getAllAdmins().map(a => a.username),
+      students: (await db.getAllStudents()).length,
+      candidates: (await db.getAllCandidates()).length,
+      elections: (await db.getAllElections()).length,
+      admins: (await db.getAllAdmins()).map(a => a.username),
       adminSessions: 0, // filled below
-      blocks: db.getAllBlocks().length,
+      blocks: (await db.getAllBlocks()).length,
     },
     neon: {},
     kv: {},

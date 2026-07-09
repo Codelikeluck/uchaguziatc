@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     if (Array.isArray(ids) && ids.length > 0) {
       toDelete = ids;
     } else if (department || yearOfStudy) {
-      const all = db.getAllStudents();
+      const all = await db.getAllStudents();
       toDelete = all
         .filter(s => {
           if (department && s.department.toLowerCase() !== department.toLowerCase()) return false;
@@ -37,8 +37,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No students match the criteria' }, { status: 404 });
     }
 
-    const deleted = db.deleteStudents(toDelete);
-    blockchain.logAuditEvent('BULK_STUDENTS_DELETED', sha256(deleted.toString()), 'ADMIN');
+    const deleted = await db.deleteStudents(toDelete);
+    await blockchain.logAuditEvent('BULK_STUDENTS_DELETED', sha256(deleted.toString()), 'ADMIN');
 
     return NextResponse.json({ success: true, deleted });
   } catch (error) {

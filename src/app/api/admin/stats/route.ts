@@ -14,15 +14,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
 
-    const stats = db.getStats();
-    const chain = blockchain.getChain();
-    const auditEvents = db.getAuditEvents();
+    const stats = await db.getStats();
+    const chain = await blockchain.getChain();
+    const auditEvents = await db.getAuditEvents();
 
     return NextResponse.json({
       success: true,
       stats: {
         ...stats,
-        chainValid: blockchain.validateChain(),
+        chainValid: await blockchain.validateChain(),
         chain,
         latestBlock: chain[chain.length - 1],
         contractAddresses: blockchain.getContractAddresses(),

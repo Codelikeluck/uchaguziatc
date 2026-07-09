@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const { action, username, password, token, electionData, candidateId, newAdmin } = await request.json();
 
     if (action === 'login') {
-      const admin = db.verifyAdminLogin(username, password);
+      const admin = await db.verifyAdminLogin(username, password);
       if (admin) {
         const sessionToken = uuidv4();
         await db.createAdminSession(sessionToken, username);
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       if (!newAdmin?.username || !newAdmin?.password) {
         return NextResponse.json({ error: 'Username and password required' }, { status: 400 });
       }
-      const existing = Array.from(db.getAllAdmins()).find(a => a.username === newAdmin.username);
+      const existing = (await db.getAllAdmins()).find(a => a.username === newAdmin.username);
       if (existing) {
         return NextResponse.json({ error: 'Admin already exists' }, { status: 409 });
       }
@@ -55,8 +55,8 @@ export async function POST(request: NextRequest) {
         role: 'admin' as const,
         createdAt: Date.now(),
       };
-      db.addAdmin(admin);
-      blockchain.logAuditEvent('ADMIN_ADDED', sha256(admin.id), 'ADMIN');
+      await db.addAdmin(admin);
+      await blockchain.logAuditEvent('ADMIN_ADDED', sha256(admin.id), 'ADMIN');
       return NextResponse.json({ success: true, admin: { id: admin.id, username: admin.username, role: admin.role } });
     }
 
@@ -64,15 +64,15 @@ export async function POST(request: NextRequest) {
       if (!newAdmin?.id) {
         return NextResponse.json({ error: 'Admin ID required' }, { status: 400 });
       }
-      if (!db.deleteAdmin(newAdmin.id)) {
+      if (!(await db.deleteAdmin(newAdmin.id))) {
         return NextResponse.json({ error: 'Cannot delete superadmin or admin not found' }, { status: 400 });
       }
-      blockchain.logAuditEvent('ADMIN_DELETED', sha256(newAdmin.id), 'ADMIN');
+      await blockchain.logAuditEvent('ADMIN_DELETED', sha256(newAdmin.id), 'ADMIN');
       return NextResponse.json({ success: true });
     }
 
     if (action === 'listAdmins') {
-      const admins = db.getAllAdmins().map(a => ({ id: a.id, username: a.username, role: a.role, createdAt: a.createdAt }));
+      const admins = (await db.getAllAdmins()).map(a => ({ id: a.id, username: a.username, role: a.role, createdAt: a.createdAt }));
       return NextResponse.json({ success: true, admins });
     }
 
@@ -80,10 +80,10 @@ export async function POST(request: NextRequest) {
       if (!electionData?.id) {
         return NextResponse.json({ error: 'Election ID required' }, { status: 400 });
       }
-      const election = db.getElection(electionData.id);
+      const election = await db.getElection(electionData.id);
       if (election) {
-        db.updateElection(electionData.id, electionData);
-        return NextResponse.json({ success: true, election: db.getElection(electionData.id) });
+        await db.updateElection(electionData.id, electionData);
+        return NextResponse.json({ success: true, election: await db.getElection(electionData.id) });
       }
       const newElection = { ...electionData, id: electionData.id || 'election_' + Date.now() };
       return NextResponse.json({ success: true, election: newElection });
@@ -93,10 +93,10 @@ export async function POST(request: NextRequest) {
       if (!electionData?.id) {
         return NextResponse.json({ error: 'Election ID required' }, { status: 400 });
       }
-      if (!db.deleteElection(electionData.id)) {
+      if (!(await db.deleteElection(electionData.id))) {
         return NextResponse.json({ error: 'Election not found' }, { status: 404 });
       }
-      blockchain.logAuditEvent('ELECTION_DELETED', sha256(electionData.id), 'ADMIN');
+      await blockchain.logAuditEvent('ELECTION_DELETED', sha256(electionData.id), 'ADMIN');
       return NextResponse.json({ success: true, message: 'Election deleted' });
     }
 
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       if (!candidateId) {
         return NextResponse.json({ error: 'Candidate ID required' }, { status: 400 });
       }
-      const candidate = db.updateCandidate(candidateId, { status: 'approved' });
+      const candidate = await db.updateCandidate(candidateId, { status: 'approved' });
       if (!candidate) {
         return NextResponse.json({ error: 'Candidate not found' }, { status: 404 });
       }
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
       if (!candidateId) {
         return NextResponse.json({ error: 'Candidate ID required' }, { status: 400 });
       }
-      const candidate = db.updateCandidate(candidateId, { status: 'rejected' });
+      const candidate = await db.updateCandidate(candidateId, { status: 'rejected' });
       if (!candidate) {
         return NextResponse.json({ error: 'Candidate not found' }, { status: 404 });
       }

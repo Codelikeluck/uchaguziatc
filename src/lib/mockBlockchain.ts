@@ -5,6 +5,7 @@ import { db } from './db';
 export class MockBlockchain {
   private chain: Block[] = [];
   private difficulty = 2;
+  private genesisCreated = false;
   private contractAddresses = {
     voterRegistry: '0xVR' + sha256('voter_registry').slice(0, 38),
     ballot: '0xBA' + sha256('ballot').slice(0, 38),
@@ -12,11 +13,11 @@ export class MockBlockchain {
     auditTrail: '0xAU' + sha256('audit').slice(0, 38),
   };
 
-  constructor() {
-    this.createGenesisBlock();
-  }
+  constructor() {}
 
-  private createGenesisBlock() {
+  private async ensureGenesis(): Promise<void> {
+    if (this.genesisCreated) return;
+    this.genesisCreated = true;
     const genesis: Block = {
       index: 0,
       timestamp: Date.now(),
@@ -30,7 +31,7 @@ export class MockBlockchain {
     };
     genesis.blockHash = this.calculateBlockHash(genesis);
     this.chain.push(genesis);
-    db.addBlock(genesis);
+    await db.addBlock(genesis);
   }
 
   private calculateBlockHash(block: Omit<Block, 'blockHash'>): string {
@@ -57,8 +58,9 @@ export class MockBlockchain {
     };
   }
 
-  addVoteTransaction(vote: Vote): Block {
-    const latestBlock = this.getLatestBlock();
+  async addVoteTransaction(vote: Vote): Promise<Block> {
+    await this.ensureGenesis();
+    const latestBlock = this.getLatestBlockUnsafe();
     const previousHash = latestBlock ? latestBlock.blockHash : '0'.repeat(64);
     const index = latestBlock ? latestBlock.index + 1 : 1;
 
@@ -79,22 +81,29 @@ export class MockBlockchain {
 
     const newBlock = this.mineBlock(newBlockData);
     this.chain.push(newBlock);
-    db.addBlock(newBlock);
+    await db.addBlock(newBlock);
 
     this.logAuditEvent('VOTE_CAST', vote.voteHash, '0xVOTER' + vote.voteHash.slice(0, 34));
 
     return newBlock;
   }
 
-  getLatestBlock(): Block | undefined {
+  private getLatestBlockUnsafe(): Block | undefined {
     return this.chain[this.chain.length - 1];
   }
 
-  getChain(): Block[] {
+  async getLatestBlock(): Promise<Block | undefined> {
+    await this.ensureGenesis();
+    return this.chain[this.chain.length - 1];
+  }
+
+  async getChain(): Promise<Block[]> {
+    await this.ensureGenesis();
     return [...this.chain];
   }
 
-  validateChain(): boolean {
+  async validateChain(): Promise<boolean> {
+    await this.ensureGenesis();
     for (let i = 1; i < this.chain.length; i++) {
       const current = this.chain[i];
       const previous = this.chain[i - 1];
@@ -106,7 +115,8 @@ export class MockBlockchain {
     return true;
   }
 
-  verifyVoteInclusion(voteHash: string): { included: boolean; blockIndex: number; merkleProof: string[] } | null {
+  async verifyVoteInclusion(voteHash: string): Promise<{ included: boolean; blockIndex: number; merkleProof: string[] } | null> {
+    await this.ensureGenesis();
     for (const block of this.chain) {
       const index = block.transactions.findIndex(t => t.voteHash === voteHash);
       if (index !== -1) {
@@ -118,16 +128,17 @@ export class MockBlockchain {
     return null;
   }
 
-  logAuditEvent(eventType: string, dataHash: string, actor: string): void {
+  async logAuditEvent(eventType: string, dataHash: string, actor: string): Promise<void> {
+    await this.ensureGenesis();
     const event: AuditEvent = {
       id: sha256(eventType + dataHash + Date.now().toString()),
       eventType,
       dataHash,
       actor,
       timestamp: Date.now(),
-      blockNumber: this.getLatestBlock()?.index || 0,
+      blockNumber: this.chain.length > 0 ? this.chain[this.chain.length - 1].index : 0,
     };
-    db.addAuditEvent(event);
+    await db.addAuditEvent(event);
   }
 
   getContractAddresses() {

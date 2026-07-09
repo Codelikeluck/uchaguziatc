@@ -28,14 +28,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (!valid) {
-      valid = db.verifyOTP(admissionNumber, otp);
+      valid = await db.verifyOTP(admissionNumber, otp);
     }
 
     if (!valid) {
       return NextResponse.json({ error: 'Invalid or expired OTP' }, { status: 401 });
     }
 
-    const student = db.getStudentByAdmission(admissionNumber);
+    const student = await db.getStudentByAdmission(admissionNumber);
     if (!student) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       .setExpirationTime('2h')
       .sign(secret);
 
-    blockchain.logAuditEvent('VOTER_AUTHENTICATED', hashStudentId(admissionNumber), student.id);
+    await blockchain.logAuditEvent('VOTER_AUTHENTICATED', hashStudentId(admissionNumber), student.id);
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,6 @@
 import { Student, Candidate, Election, Vote, Block, AuditEvent } from '@/types';
 import { sha256 } from './crypto';
-import { saveData, loadData, loadDataSync } from './persist';
+import { saveData, loadData } from './persist';
 import { kvSet, kvGet, kvDel } from './kv';
 import { neonAddStudent, neonDeleteStudent, neonDeleteStudents, neonUpdateStudent, neonAddCandidate as neonAddCandidateFn, neonDeleteCandidate as neonDeleteCandidateFn, neonUpdateCandidate as neonUpdateCandidateFn, neonSaveElection as neonSaveElectionFn, neonDeleteElection as neonDeleteElectionFn, neonAddVote as neonAddVoteFn, neonAddBlock as neonAddBlockFn, neonAddAdmin as neonAddAdminFn, neonDeleteAdmin as neonDeleteAdminFn } from './neon';
 
@@ -36,14 +36,33 @@ class Database {
   private admins: Map<string, AdminAccount> = new Map();
   private persistQueue: Promise<void> = Promise.resolve();
 
+  private initPromise: Promise<void>;
+  private initialized = false;
+
   constructor() {
-    const data = loadDataSync();
-    if (data) {
-      this.loadFromData(data);
-    } else {
+    this.initPromise = this._init();
+  }
+
+  private async _init(): Promise<void> {
+    try {
+      const data = await loadData();
+      if (data) {
+        console.log(`_init: loaded ${data.students?.length || 0} students, ${data.candidates?.length || 0} candidates`);
+        this.loadFromData(data);
+      }
+    } catch (err) {
+      console.error('_init failed:', err);
+    }
+    if (this.students.size === 0) {
+      console.log('_init: no data found, seeding');
       this.seedData();
     }
-    this.syncFromKV();
+    this.initialized = true;
+    console.log('_init: complete');
+  }
+
+  private async ensureInit(): Promise<void> {
+    if (!this.initialized) await this.initPromise;
   }
 
   private loadFromData(data: Record<string, any>) {
@@ -61,29 +80,6 @@ class Database {
     this.otps = new Map((data.otps || []).filter(([, v]: any) => Date.now() <= v.expires));
     this.adminSessions = new Map(data.adminSessions || []);
     this.admins = new Map(data.admins || []);
-  }
-
-  private async syncFromKV(): Promise<void> {
-    try {
-      const data = await loadData();
-      if (data) {
-        const remoteCount = data.students?.length || 0;
-        const localCount = this.students.size;
-        if (remoteCount > localCount || localCount === 0) {
-          console.log(`syncFromKV: loading from remote (remote=${remoteCount}, local=${localCount})`);
-          this.loadFromData(data);
-        } else {
-          console.log(`syncFromKV: keeping local (remote=${remoteCount}, local=${localCount})`);
-        }
-      } else if (this.students.size === 0) {
-        console.log('syncFromKV: no data found in any backend, seeding');
-        this.seedData();
-      } else {
-        console.log(`syncFromKV: no remote data, keeping ${this.students.size} students from sync source`);
-      }
-    } catch (err) {
-      console.error('KV sync failed (non-fatal):', err);
-    }
   }
 
   private async persist(): Promise<void> {
@@ -150,15 +146,18 @@ class Database {
     this.persist();
   }
 
-  getStudentByAdmission(admissionNumber: string): Student | undefined {
+  async getStudentByAdmission(admissionNumber: string): Promise<Student | undefined> {
+    await this.ensureInit();
     return Array.from(this.students.values()).find(s => s.admissionNumber === admissionNumber);
   }
 
-  getStudent(id: string): Student | undefined {
+  async getStudent(id: string): Promise<Student | undefined> {
+    await this.ensureInit();
     return this.students.get(id);
   }
 
-  updateStudent(id: string, data: Partial<Student>): Student | undefined {
+  async updateStudent(id: string, data: Partial<Student>): Promise<Student | undefined> {
+    await this.ensureInit();
     const student = this.students.get(id);
     if (!student) return undefined;
     const updated = { ...student, ...data };
@@ -168,14 +167,16 @@ class Database {
     return updated;
   }
 
-  addStudent(student: Student): Student {
+  async addStudent(student: Student): Promise<Student> {
+    await this.ensureInit();
     this.students.set(student.id, student);
     this.persist();
     if (process.env.DATABASE_URL) neonAddStudent(student);
     return student;
   }
 
-  deleteStudent(id: string): boolean {
+  async deleteStudent(id: string): Promise<boolean> {
+    await this.ensureInit();
     const result = this.students.delete(id);
     if (result) {
       this.persist();
@@ -184,30 +185,36 @@ class Database {
     return result;
   }
 
-  getAllStudents(): Student[] {
+  async getAllStudents(): Promise<Student[]> {
+    await this.ensureInit();
     return Array.from(this.students.values());
   }
 
-  addCandidate(candidate: Candidate): Candidate {
+  async addCandidate(candidate: Candidate): Promise<Candidate> {
+    await this.ensureInit();
     this.candidates.set(candidate.id, candidate);
     this.persist();
     if (process.env.DATABASE_URL) neonAddCandidateFn(candidate);
     return candidate;
   }
 
-  getCandidate(id: string): Candidate | undefined {
+  async getCandidate(id: string): Promise<Candidate | undefined> {
+    await this.ensureInit();
     return this.candidates.get(id);
   }
 
-  getCandidatesByPosition(position: string): Candidate[] {
+  async getCandidatesByPosition(position: string): Promise<Candidate[]> {
+    await this.ensureInit();
     return Array.from(this.candidates.values()).filter(c => c.position === position && c.status === 'approved');
   }
 
-  getAllCandidates(): Candidate[] {
+  async getAllCandidates(): Promise<Candidate[]> {
+    await this.ensureInit();
     return Array.from(this.candidates.values());
   }
 
-  updateCandidate(id: string, data: Partial<Candidate>): Candidate | undefined {
+  async updateCandidate(id: string, data: Partial<Candidate>): Promise<Candidate | undefined> {
+    await this.ensureInit();
     const candidate = this.candidates.get(id);
     if (!candidate) return undefined;
     const updated = { ...candidate, ...data };
@@ -217,7 +224,8 @@ class Database {
     return updated;
   }
 
-  deleteCandidate(id: string): boolean {
+  async deleteCandidate(id: string): Promise<boolean> {
+    await this.ensureInit();
     const result = this.candidates.delete(id);
     if (result) {
       this.persist();
@@ -226,15 +234,18 @@ class Database {
     return result;
   }
 
-  getElection(id: string): Election | undefined {
+  async getElection(id: string): Promise<Election | undefined> {
+    await this.ensureInit();
     return this.elections.get(id);
   }
 
-  getActiveElection(): Election | undefined {
+  async getActiveElection(): Promise<Election | undefined> {
+    await this.ensureInit();
     return Array.from(this.elections.values()).find(e => e.status === 'active');
   }
 
-  updateElection(id: string, data: Partial<Election>): Election | undefined {
+  async updateElection(id: string, data: Partial<Election>): Promise<Election | undefined> {
+    await this.ensureInit();
     const election = this.elections.get(id);
     if (!election) return undefined;
     const updated = { ...election, ...data };
@@ -244,18 +255,21 @@ class Database {
     return updated;
   }
 
-  addElection(election: Election): Election {
+  async addElection(election: Election): Promise<Election> {
+    await this.ensureInit();
     this.elections.set(election.id, election);
     this.persist();
     if (process.env.DATABASE_URL) neonSaveElectionFn(election);
     return election;
   }
 
-  getAllElections(): Election[] {
+  async getAllElections(): Promise<Election[]> {
+    await this.ensureInit();
     return Array.from(this.elections.values());
   }
 
-  deleteElection(id: string): boolean {
+  async deleteElection(id: string): Promise<boolean> {
+    await this.ensureInit();
     const result = this.elections.delete(id);
     if (result) {
       this.persist();
@@ -264,15 +278,18 @@ class Database {
     return result;
   }
 
-  getStudentsByDepartment(department: string): Student[] {
+  async getStudentsByDepartment(department: string): Promise<Student[]> {
+    await this.ensureInit();
     return Array.from(this.students.values()).filter(s => s.department.toLowerCase() === department.toLowerCase());
   }
 
-  getStudentsByYear(year: number): Student[] {
+  async getStudentsByYear(year: number): Promise<Student[]> {
+    await this.ensureInit();
     return Array.from(this.students.values()).filter(s => s.yearOfStudy === year);
   }
 
-  deleteStudents(ids: string[]): number {
+  async deleteStudents(ids: string[]): Promise<number> {
+    await this.ensureInit();
     let count = 0;
     for (const id of ids) {
       if (this.students.delete(id)) count++;
@@ -284,74 +301,86 @@ class Database {
     return count;
   }
 
-  addVote(vote: Vote): Vote {
+  async addVote(vote: Vote): Promise<Vote> {
+    await this.ensureInit();
     this.votes.set(vote.voteHash, vote);
     this.persist();
     if (process.env.DATABASE_URL) neonAddVoteFn(vote);
     return vote;
   }
 
-  getVote(hash: string): Vote | undefined {
+  async getVote(hash: string): Promise<Vote | undefined> {
+    await this.ensureInit();
     return this.votes.get(hash);
   }
 
-  getAllVotes(): Vote[] {
+  async getAllVotes(): Promise<Vote[]> {
+    await this.ensureInit();
     return Array.from(this.votes.values());
   }
 
-  addBlock(block: Block): Block {
+  async addBlock(block: Block): Promise<Block> {
+    await this.ensureInit();
     this.blocks.push(block);
     this.persist();
     if (process.env.DATABASE_URL) neonAddBlockFn(block);
     return block;
   }
 
-  getLatestBlock(): Block | undefined {
+  async getLatestBlock(): Promise<Block | undefined> {
+    await this.ensureInit();
     return this.blocks[this.blocks.length - 1];
   }
 
-  getAllBlocks(): Block[] {
+  async getAllBlocks(): Promise<Block[]> {
+    await this.ensureInit();
     return [...this.blocks];
   }
 
-  getBlockByIndex(index: number): Block | undefined {
+  async getBlockByIndex(index: number): Promise<Block | undefined> {
+    await this.ensureInit();
     return this.blocks[index];
   }
 
-  storeOTP(identifier: string, otp: string, ttlMinutes: number = 10): void {
+  async storeOTP(identifier: string, otp: string, ttlMinutes: number = 10): Promise<void> {
+    await this.ensureInit();
     this.otps.set(identifier, { otp, expires: Date.now() + ttlMinutes * 60000 });
-    this.persist();
+    await this.persist();
   }
 
-  verifyOTP(identifier: string, otp: string): boolean {
+  async verifyOTP(identifier: string, otp: string): Promise<boolean> {
+    await this.ensureInit();
     const record = this.otps.get(identifier);
     if (!record) return false;
     if (Date.now() > record.expires) {
       this.otps.delete(identifier);
-      this.persist();
+      await this.persist();
       return false;
     }
     const valid = record.otp === otp;
     if (valid) {
       this.otps.delete(identifier);
-      this.persist();
+      await this.persist();
     }
     return valid;
   }
 
   async createAdminSession(token: string, username: string): Promise<void> {
+    await this.ensureInit();
     this.adminSessions.set(token, { username });
     await kvSet(`session:${token}`, { username });
     await this.persist();
   }
 
   async deleteAdminSession(token: string): Promise<void> {
+    await this.ensureInit();
     this.adminSessions.delete(token);
     await kvDel(`session:${token}`);
     await this.persist();
   }
 
   async verifyAdminSession(token: string): Promise<boolean> {
+    await this.ensureInit();
     if (this.adminSessions.has(token)) return true;
 
     const kvSession = await kvGet<{ username: string }>(`session:${token}`);
@@ -371,51 +400,59 @@ class Database {
     return false;
   }
 
-  verifyAdminLogin(username: string, password: string): AdminAccount | null {
+  async verifyAdminLogin(username: string, password: string): Promise<AdminAccount | null> {
+    await this.ensureInit();
     const admin = Array.from(this.admins.values()).find(a => a.username === username);
     if (!admin) return null;
     if (admin.passwordHash !== sha256(password)) return null;
     return admin;
   }
 
-  addAdmin(admin: AdminAccount): void {
+  async addAdmin(admin: AdminAccount): Promise<void> {
+    await this.ensureInit();
     this.admins.set(admin.id, admin);
-    this.persist();
+    await this.persist();
     if (process.env.DATABASE_URL) neonAddAdminFn(admin);
   }
 
-  getAllAdmins(): AdminAccount[] {
+  async getAllAdmins(): Promise<AdminAccount[]> {
+    await this.ensureInit();
     return Array.from(this.admins.values());
   }
 
-  deleteAdmin(id: string): boolean {
+  async deleteAdmin(id: string): Promise<boolean> {
+    await this.ensureInit();
     if (this.admins.get(id)?.role === 'superadmin') return false;
     const result = this.admins.delete(id);
     if (result) {
-      this.persist();
+      await this.persist();
       if (process.env.DATABASE_URL) neonDeleteAdminFn(id);
     }
     return result;
   }
 
-  addAuditEvent(event: AuditEvent): void {
+  async addAuditEvent(event: AuditEvent): Promise<void> {
+    await this.ensureInit();
     this.auditEvents.push(event);
-    this.persist();
+    await this.persist();
   }
 
-  getAuditEvents(): AuditEvent[] {
+  async getAuditEvents(): Promise<AuditEvent[]> {
+    await this.ensureInit();
     return [...this.auditEvents];
   }
 
-  getAuditEventsByType(type: string): AuditEvent[] {
+  async getAuditEventsByType(type: string): Promise<AuditEvent[]> {
+    await this.ensureInit();
     return this.auditEvents.filter(e => e.eventType === type);
   }
 
-  getStats() {
-    const students = this.getAllStudents();
-    const candidates = this.getAllCandidates();
-    const votes = this.getAllVotes();
-    const blocks = this.getAllBlocks();
+  async getStats() {
+    await this.ensureInit();
+    const students = await this.getAllStudents();
+    const candidates = await this.getAllCandidates();
+    const votes = await this.getAllVotes();
+    const blocks = await this.getAllBlocks();
     return {
       totalStudents: students.length,
       totalVoters: students.filter(s => s.hasVoted).length,

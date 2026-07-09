@@ -7,14 +7,14 @@ export async function GET(request: NextRequest) {
     const id = searchParams.get('id');
 
     if (id) {
-      const election = db.getElection(id);
+      const election = await db.getElection(id);
       if (!election) {
         return NextResponse.json({ error: 'Election not found' }, { status: 404 });
       }
       return NextResponse.json({ success: true, election });
     }
 
-    const active = db.getActiveElection();
+    const active = await db.getActiveElection();
     return NextResponse.json({ success: true, election: active });
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
