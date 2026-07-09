@@ -7,9 +7,10 @@ interface CountdownTimerProps {
   label?: string;
   endedLabel?: string;
   compact?: boolean;
+  className?: string;
 }
 
-export default function CountdownTimer({ endDate, label = 'Voting ends in', endedLabel = 'Election ended', compact = false }: CountdownTimerProps) {
+export default function CountdownTimer({ endDate, label = 'Voting ends in', endedLabel = 'Election ended', compact = false, className = '' }: CountdownTimerProps) {
   const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
   const [ended, setEnded] = useState(false);
 
@@ -39,7 +40,7 @@ export default function CountdownTimer({ endDate, label = 'Voting ends in', ende
 
   if (ended) {
     return (
-      <div className="atc-badge bg-red-100 text-red-700">
+      <div className={`atc-badge bg-red-100 text-red-700 ${className}`}>
         {endedLabel}
       </div>
     );
@@ -49,7 +50,7 @@ export default function CountdownTimer({ endDate, label = 'Voting ends in', ende
 
   if (compact) {
     return (
-      <span className="font-mono font-bold text-atc-primary">
+      <span className={`font-mono font-bold ${className || 'text-atc-primary'}`}>
         {timeLeft.days > 0 ? `${timeLeft.days}d ` : ''}
         {String(timeLeft.hours).padStart(2, '0')}:{String(timeLeft.minutes).padStart(2, '0')}:{String(timeLeft.seconds).padStart(2, '0')}
       </span>
@@ -57,7 +58,7 @@ export default function CountdownTimer({ endDate, label = 'Voting ends in', ende
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={`flex items-center gap-2 ${className}`}>
       <span className="text-sm text-slate-600">{label}</span>
       <div className="flex items-center gap-1 font-mono font-bold">
         {timeLeft.days > 0 && (

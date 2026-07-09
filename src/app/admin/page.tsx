@@ -704,7 +704,7 @@ export default function AdminPage() {
                         <ImageIcon className="w-4 h-4" /> Choose Photo
                       </button>
                       {imagePreview && (
-                        <img src={imagePreview} alt="Preview" className="w-12 h-12 rounded-full object-cover border-2 border-atc-primary" />
+                        <img src={imagePreview} alt="Preview" className="w-24 h-24 rounded-full object-cover border-2 border-atc-primary" />
                       )}
                     </div>
                   </div>
@@ -736,7 +736,7 @@ export default function AdminPage() {
                           <img
                             src={candidate.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(candidate.name)}&background=1e40af&color=fff&size=200`}
                             alt={candidate.name}
-                            className="w-12 h-12 rounded-full object-cover border-2 border-slate-200"
+                            className="w-16 h-16 rounded-full object-cover border-2 border-slate-200"
                           />
                           <div>
                             <h4 className="font-bold text-slate-900">{candidate.name}</h4>
@@ -1146,9 +1146,11 @@ export default function AdminPage() {
                         <td className="py-3 px-4">Year {student.yearOfStudy}</td>
                         <td className="py-3 px-4">
                           {student.hasVoted ? (
-                            <span className="atc-badge bg-emerald-100 text-emerald-700 text-xs"><CheckCircle className="w-3 h-3 mr-1" /> Yes</span>
+                            <span className="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-700 font-semibold px-3 py-1.5 rounded-full text-sm">
+                              <CheckCircle className="w-4 h-4" /> Voted
+                            </span>
                           ) : (
-                            <span className="atc-badge bg-slate-100 text-slate-600 text-xs">No</span>
+                            <span className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full text-sm">Not Voted</span>
                           )}
                         </td>
                         <td className="py-3 px-4">

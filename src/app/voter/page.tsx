@@ -377,10 +377,10 @@ export default function VoterPage() {
                   {election?.endDate && (
                     <div className="hidden sm:flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                       <Clock className="w-4 h-4 text-amber-600" />
-                      <CountdownTimer endDate={election.endDate} compact />
-                    </div>
-                  )}
-                  <div className="atc-badge bg-blue-100 text-atc-primary">
+                          <CountdownTimer endDate={election.endDate} compact className="text-white" />
+                        </div>
+                      )}
+                      <div className="atc-badge bg-blue-100 text-atc-primary">
                     <Shield className="w-3 h-3 mr-1" />
                     Verified Voter
                   </div>
@@ -441,7 +441,7 @@ export default function VoterPage() {
                             <img 
                               src={pres.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(pres.name)}&background=1e40af&color=fff&size=200`}
                               alt={pres.name}
-                              className={`w-14 h-14 rounded-full object-cover border-2 flex-shrink-0 ${
+                              className={`w-20 h-20 rounded-full object-cover border-2 flex-shrink-0 ${
                                 isSelected ? 'border-atc-primary' : 'border-slate-200'
                               }`}
                             />
@@ -459,7 +459,7 @@ export default function VoterPage() {
                                   <img 
                                     src={vp.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(vp.name)}&background=8b5cf6&color=fff&size=200`}
                                     alt={vp.name}
-                                    className="w-8 h-8 rounded-full object-cover border border-slate-300"
+                                    className="w-10 h-10 rounded-full object-cover border border-slate-300"
                                   />
                                   <div>
                                     <span className="text-sm font-medium text-slate-700">{vp.name}</span>

@@ -53,7 +53,7 @@ export default function HomePage() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-blue-200 font-medium">Voting ends in</span>
-              <CountdownTimer endDate={election.endDate} compact />
+              <CountdownTimer endDate={election.endDate} compact className="text-white" />
             </div>
           </div>
         </div>

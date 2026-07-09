@@ -145,7 +145,7 @@ export default function ResultsContent() {
                 <Clock className="w-6 h-6 text-blue-200" />
                 <div>
                   <p className="text-sm text-blue-200 font-medium">Voting ends in</p>
-                  <CountdownTimer endDate={election.endDate} compact />
+                  <CountdownTimer endDate={election.endDate} compact className="text-white" />
                 </div>
               </div>
               <div className="text-right">
@@ -265,7 +265,7 @@ export default function ResultsContent() {
                           <img 
                             src={candidate.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(candidate.name)}&background=1e40af&color=fff&size=200`}
                             alt={candidate.name}
-                            className="w-10 h-10 rounded-full object-cover border-2 border-slate-200"
+                            className="w-16 h-16 rounded-full object-cover border-2 border-slate-200"
                           />
                           <div>
                             <div className="flex items-center gap-2">
@@ -296,7 +296,7 @@ export default function ResultsContent() {
                           <img 
                             src={candidate.runningMateImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(candidate.runningMateName)}&background=8b5cf6&color=fff&size=200`}
                             alt={candidate.runningMateName}
-                            className="w-7 h-7 rounded-full object-cover border border-slate-300"
+                            className="w-10 h-10 rounded-full object-cover border border-slate-300"
                           />
                           <span className="text-xs text-slate-600">
                             <span className="font-medium text-slate-700">{candidate.runningMateName}</span> — Vice President
