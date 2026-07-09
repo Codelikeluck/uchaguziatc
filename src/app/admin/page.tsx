@@ -52,7 +52,11 @@ export default function AdminPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'elections' | 'candidates' | 'students' | 'blockchain' | 'audit'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'elections' | 'candidates' | 'students' | 'admins' | 'blockchain' | 'audit'>('overview');
+  const [admins, setAdmins] = useState<{ id: string; username: string; role: string; createdAt: number }[]>([]);
+  const [showAddAdmin, setShowAddAdmin] = useState(false);
+  const [newAdminUsername, setNewAdminUsername] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
 
   // Students state
   const [students, setStudents] = useState<Student[]>([]);
@@ -133,6 +137,7 @@ export default function AdminPage() {
         fetchStudents(data.token);
         fetchCandidates(data.token);
         fetchElections(data.token);
+        fetchAdmins();
       } else {
         setError(data.error || 'Invalid credentials');
       }
@@ -328,7 +333,50 @@ export default function AdminPage() {
     setLoading(false);
   };
 
+  const fetchAdmins = async () => {
+    try {
+      const res = await fetch('/api/admin/config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ action: 'listAdmins' }),
+      });
+      const data = await res.json();
+      if (data.success) setAdmins(data.admins);
+    } catch (e) { console.error('Fetch admins error:', e); }
+  };
+
+  const addAdminUser = async () => {
+    try {
+      const res = await fetch('/api/admin/config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ action: 'addAdmin', newAdmin: { username: newAdminUsername, password: newAdminPassword } }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowAddAdmin(false); setNewAdminUsername(''); setNewAdminPassword('');
+        fetchAdmins();
+      } else {
+        setError(data.error);
+      }
+    } catch (e) { console.error('Add admin error:', e); }
+  };
+
+  const deleteAdminUser = async (id: string) => {
+    if (!confirm('Delete this admin?')) return;
+    try {
+      const res = await fetch('/api/admin/config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ action: 'deleteAdmin', newAdmin: { id } }),
+      });
+      const data = await res.json();
+      if (data.success) setAdmins(admins.filter(a => a.id !== id));
+    } catch (e) { console.error('Delete admin error:', e); }
+  };
+
   const logout = () => {
+    fetch('/api/admin/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'logout', token: localStorage.getItem('atc_admin_token') }),
+    }).catch(() => {});
     localStorage.removeItem('atc_admin_token');
     setLoggedIn(false); setToken(''); setStats(null);
   };
@@ -402,10 +450,11 @@ export default function AdminPage() {
             { key: 'elections', icon: Calendar, label: 'Elections' },
             { key: 'candidates', icon: Users, label: 'Candidates' },
             { key: 'students', icon: GraduationCap, label: 'Students' },
+            { key: 'admins', icon: Shield, label: 'Admins' },
             { key: 'blockchain', icon: Blocks, label: 'Blockchain' },
             { key: 'audit', icon: Activity, label: 'Audit' },
           ].map(({ key, icon: Icon, label }) => (
-            <button key={key} onClick={() => setActiveTab(key as any)}
+            <button key={key} onClick={() => { setActiveTab(key as any); if (key === 'admins') fetchAdmins(); }}
               className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
                 activeTab === key ? 'bg-atc-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
               }`}>
@@ -1188,6 +1237,77 @@ export default function AdminPage() {
                 <div className="text-center py-8 text-slate-500">
                   <GraduationCap className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                   <p>No students found.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ADMINS TAB */}
+        {activeTab === 'admins' && (
+          <div className="atc-card">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-atc-primary" /> Admin Management
+                </h3>
+                <p className="text-sm text-slate-500">Manage system administrators</p>
+              </div>
+              <button onClick={() => setShowAddAdmin(true)} className="atc-btn-primary text-sm py-2 inline-flex items-center gap-1">
+                <Plus className="w-4 h-4" /> Add Admin
+              </button>
+            </div>
+
+            {showAddAdmin && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="grid md:grid-cols-3 gap-3 mb-3">
+                  <input type="text" value={newAdminUsername} onChange={e => setNewAdminUsername(e.target.value)}
+                    placeholder="Username" className="atc-input text-sm py-2" />
+                  <input type="password" value={newAdminPassword} onChange={e => setNewAdminPassword(e.target.value)}
+                    placeholder="Password" className="atc-input text-sm py-2" />
+                  <button onClick={addAdminUser} disabled={!newAdminUsername || !newAdminPassword}
+                    className="atc-btn-primary text-sm py-2 disabled:opacity-50">Create Admin</button>
+                </div>
+                <button onClick={() => { setShowAddAdmin(false); setNewAdminUsername(''); setNewAdminPassword(''); }}
+                  className="text-xs text-slate-500 hover:text-slate-700">Cancel</button>
+              </div>
+            )}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500 text-sm">
+                    <th className="py-3 px-4 font-medium">Username</th>
+                    <th className="py-3 px-4 font-medium">Role</th>
+                    <th className="py-3 px-4 font-medium">Created</th>
+                    <th className="py-3 px-4 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {admins.map(admin => (
+                    <tr key={admin.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="py-3 px-4 font-medium">{admin.username}</td>
+                      <td className="py-3 px-4">
+                        <span className={`atc-badge text-xs ${admin.role === 'superadmin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {admin.role}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-sm text-slate-600">{new Date(admin.createdAt).toLocaleDateString()}</td>
+                      <td className="py-3 px-4">
+                        {admin.role !== 'superadmin' && (
+                          <button onClick={() => deleteAdminUser(admin.id)} className="text-red-400 hover:text-red-600 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {admins.length === 0 && (
+                <div className="text-center py-8 text-slate-500">
+                  <Shield className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                  <p>No admins found.</p>
                 </div>
               )}
             </div>

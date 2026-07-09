@@ -13,16 +13,14 @@ async function checkAdmin(request: NextRequest): Promise<string | null> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { action, username, password, token, electionData, candidateId } = await request.json();
+    const { action, username, password, token, electionData, candidateId, newAdmin } = await request.json();
 
     if (action === 'login') {
-      const adminUser = process.env.ADMIN_USERNAME || 'soateco_admin';
-      const adminPass = process.env.ADMIN_PASSWORD || 'ATC_Secure2024!';
-
-      if (username === adminUser && password === adminPass) {
-        const token = uuidv4();
-        db.createAdminSession(token, username, 24);
-        return NextResponse.json({ success: true, token });
+      const admin = db.verifyAdminLogin(username, password);
+      if (admin) {
+        const sessionToken = uuidv4();
+        db.createAdminSession(sessionToken, username);
+        return NextResponse.json({ success: true, token: sessionToken, admin: { id: admin.id, username: admin.username, role: admin.role } });
       }
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
@@ -32,9 +30,50 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: valid });
     }
 
+    if (action === 'logout') {
+      if (token) db.deleteAdminSession(token);
+      return NextResponse.json({ success: true });
+    }
+
     const adminToken = await checkAdmin(request);
     if (!adminToken) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+    }
+
+    if (action === 'addAdmin') {
+      if (!newAdmin?.username || !newAdmin?.password) {
+        return NextResponse.json({ error: 'Username and password required' }, { status: 400 });
+      }
+      const existing = Array.from(db.getAllAdmins()).find(a => a.username === newAdmin.username);
+      if (existing) {
+        return NextResponse.json({ error: 'Admin already exists' }, { status: 409 });
+      }
+      const admin = {
+        id: 'admin_' + uuidv4().slice(0, 8),
+        username: newAdmin.username,
+        passwordHash: sha256(newAdmin.password),
+        role: 'admin' as const,
+        createdAt: Date.now(),
+      };
+      db.addAdmin(admin);
+      blockchain.logAuditEvent('ADMIN_ADDED', sha256(admin.id), 'ADMIN');
+      return NextResponse.json({ success: true, admin: { id: admin.id, username: admin.username, role: admin.role } });
+    }
+
+    if (action === 'deleteAdmin') {
+      if (!newAdmin?.id) {
+        return NextResponse.json({ error: 'Admin ID required' }, { status: 400 });
+      }
+      if (!db.deleteAdmin(newAdmin.id)) {
+        return NextResponse.json({ error: 'Cannot delete superadmin or admin not found' }, { status: 400 });
+      }
+      blockchain.logAuditEvent('ADMIN_DELETED', sha256(newAdmin.id), 'ADMIN');
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === 'listAdmins') {
+      const admins = db.getAllAdmins().map(a => ({ id: a.id, username: a.username, role: a.role, createdAt: a.createdAt }));
+      return NextResponse.json({ success: true, admins });
     }
 
     if (action === 'updateElection') {

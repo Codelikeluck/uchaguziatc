@@ -77,11 +77,31 @@ CREATE TABLE IF NOT EXISTS otps (
   expires BIGINT NOT NULL
 );
 
--- ========== ADMIN SESSIONS (auto-cleaned) ==========
+-- ========== ADMIN SESSIONS (no expiry — valid until sign out) ==========
 CREATE TABLE IF NOT EXISTS admin_sessions (
   token TEXT PRIMARY KEY,
-  username TEXT NOT NULL,
-  expires BIGINT NOT NULL
+  username TEXT NOT NULL
+);
+
+-- ========== ADMINS (login credentials) ==========
+CREATE TABLE IF NOT EXISTS admins (
+  id TEXT PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'admin' CHECK (role IN ('superadmin', 'admin')),
+  created_at BIGINT NOT NULL
+);
+
+-- Insert default superadmin (password: ATC_Secure2024!)
+INSERT INTO admins (id, username, password_hash, role, created_at)
+VALUES ('admin_default', 'soateco_admin', '5d9f4d2d8c9f3b0a2e8c7d1b6a4f3e2c1d5b8a7c9f0e3d2b1a4c6e8f0d9b7a', 'superadmin', EXTRACT(EPOCH FROM NOW()) * 1000)
+ON CONFLICT (id) DO NOTHING;
+
+-- ========== SNAPSHOTS (for JSONB full-state persistence) ==========
+CREATE TABLE IF NOT EXISTS snapshots (
+  id TEXT PRIMARY KEY,
+  data JSONB NOT NULL,
+  updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- ========== INDEXES for performance ==========
@@ -93,4 +113,5 @@ CREATE INDEX IF NOT EXISTS idx_candidates_status ON candidates(status);
 CREATE INDEX IF NOT EXISTS idx_votes_election ON votes(election_id);
 CREATE INDEX IF NOT EXISTS idx_audit_events_type ON audit_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_otps_expires ON otps(expires);
-CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires ON admin_sessions(expires);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_username ON admin_sessions(username);
+CREATE INDEX IF NOT EXISTS idx_admins_username ON admins(username);

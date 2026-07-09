@@ -2,6 +2,14 @@ import { Student, Candidate, Election, Vote, Block, AuditEvent } from '@/types';
 import { sha256 } from './crypto';
 import { saveData, loadData, loadDataSync } from './persist';
 
+interface AdminAccount {
+  id: string;
+  username: string;
+  passwordHash: string;
+  role: 'superadmin' | 'admin';
+  createdAt: number;
+}
+
 interface DbSnapshot {
   students: [string, Student][];
   candidates: [string, Candidate][];
@@ -10,7 +18,8 @@ interface DbSnapshot {
   blocks: Block[];
   auditEvents: AuditEvent[];
   otps: [string, { otp: string; expires: number }][];
-  adminSessions: [string, { username: string; expires: number }][];
+  adminSessions: [string, { username: string }][];
+  admins: [string, AdminAccount][];
 }
 
 class Database {
@@ -21,7 +30,8 @@ class Database {
   private blocks: Block[] = [];
   private auditEvents: AuditEvent[] = [];
   private otps: Map<string, { otp: string; expires: number }> = new Map();
-  private adminSessions: Map<string, { username: string; expires: number }> = new Map();
+  private adminSessions: Map<string, { username: string }> = new Map();
+  private admins: Map<string, AdminAccount> = new Map();
   private persistQueue: Promise<void> = Promise.resolve();
 
   constructor() {
@@ -47,7 +57,8 @@ class Database {
     });
 
     this.otps = new Map((data.otps || []).filter(([, v]: any) => Date.now() <= v.expires));
-    this.adminSessions = new Map((data.adminSessions || []).filter(([, v]: any) => Date.now() <= v.expires));
+    this.adminSessions = new Map(data.adminSessions || []);
+    this.admins = new Map(data.admins || []);
   }
 
   private async syncFromKV(): Promise<void> {
@@ -74,6 +85,7 @@ class Database {
         auditEvents: this.auditEvents,
         otps: Array.from(this.otps.entries()),
         adminSessions: Array.from(this.adminSessions.entries()),
+        admins: Array.from(this.admins.entries()),
       };
       await saveData(snapshot as any);
     });
@@ -114,6 +126,15 @@ class Database {
       { id: 'cand_3', studentId: 'stud_4', name: 'Amina Juma', position: 'Vice President', manifesto: 'Unity and diversity in student leadership.', imageUrl: 'https://ui-avatars.com/api/?name=Amina+Juma&background=d97706&color=fff&size=200', documents: [], gpa: 3.7, yearOfStudy: 4, status: 'approved' as const, votes: 0 },
     ];
     sampleCandidates.forEach(c => this.candidates.set(c.id, c));
+
+    const defaultAdmin: AdminAccount = {
+      id: 'admin_default',
+      username: process.env.ADMIN_USERNAME || 'soateco_admin',
+      passwordHash: sha256(process.env.ADMIN_PASSWORD || 'ATC_Secure2024!'),
+      role: 'superadmin',
+      createdAt: Date.now(),
+    };
+    this.admins.set(defaultAdmin.id, defaultAdmin);
     this.persist();
   }
 
@@ -286,8 +307,13 @@ class Database {
     return valid;
   }
 
-  createAdminSession(token: string, username: string, ttlHours: number = 24): void {
-    this.adminSessions.set(token, { username, expires: Date.now() + ttlHours * 3600000 });
+  createAdminSession(token: string, username: string): void {
+    this.adminSessions.set(token, { username });
+    this.persist();
+  }
+
+  deleteAdminSession(token: string): void {
+    this.adminSessions.delete(token);
     this.persist();
   }
 
@@ -296,20 +322,37 @@ class Database {
     if (!session) {
       const snapshot = await loadData();
       if (snapshot?.adminSessions) {
-        const found = (snapshot.adminSessions as [string, { username: string; expires: number }][]).find(([t]) => t === token);
+        const found = (snapshot.adminSessions as [string, { username: string }][]).find(([t]) => t === token);
         if (found) {
           session = found[1];
           this.adminSessions.set(token, session);
         }
       }
     }
-    if (!session) return false;
-    if (Date.now() > session.expires) {
-      this.adminSessions.delete(token);
-      this.persist();
-      return false;
-    }
-    return true;
+    return !!session;
+  }
+
+  verifyAdminLogin(username: string, password: string): AdminAccount | null {
+    const admin = Array.from(this.admins.values()).find(a => a.username === username);
+    if (!admin) return null;
+    if (admin.passwordHash !== sha256(password)) return null;
+    return admin;
+  }
+
+  addAdmin(admin: AdminAccount): void {
+    this.admins.set(admin.id, admin);
+    this.persist();
+  }
+
+  getAllAdmins(): AdminAccount[] {
+    return Array.from(this.admins.values());
+  }
+
+  deleteAdmin(id: string): boolean {
+    if (this.admins.get(id)?.role === 'superadmin') return false;
+    const result = this.admins.delete(id);
+    if (result) this.persist();
+    return result;
   }
 
   addAuditEvent(event: AuditEvent): void {

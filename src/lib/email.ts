@@ -1,25 +1,17 @@
 import nodemailer from 'nodemailer';
 
-interface EmailConfig {
-  host: string;
-  port: number;
-  user: string;
-  pass: string;
-  from: string;
+function sanitizeHost(host: string): string {
+  return host.replace(/^(smtp:\/\/|http:\/\/|https:\/\/)/, '');
 }
 
-function getConfig(): EmailConfig | null {
-  const host = process.env.SMTP_HOST;
+function getConfig(): { host: string; port: number; user: string; pass: string; from: string } | null {
+  const rawHost = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  if (!host || !user || !pass) return null;
-  return {
-    host,
-    port: parseInt(process.env.SMTP_PORT || '587', 10),
-    user,
-    pass,
-    from: process.env.EMAIL_FROM || user,
-  };
+  if (!rawHost || !user || !pass) return null;
+  const host = sanitizeHost(rawHost);
+  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  return { host, port, user, pass, from: process.env.EMAIL_FROM || user };
 }
 
 export async function sendOTPEmail(
