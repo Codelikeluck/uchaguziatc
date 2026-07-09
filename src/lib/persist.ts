@@ -26,12 +26,12 @@ export async function loadData(): Promise<Record<string, any> | null> {
     if (!neonInited) {
       neonInited = await neonInitTables();
     }
-    if (neonInited) {
-      const neonData = await neonLoadSnapshot();
-      if (neonData) {
-        neonSyncAll(neonData);
-        return neonData;
-      }
+    // Always try to load the snapshot, even if table init failed
+    // (the snapshots table may already exist from a previous run)
+    const neonData = await neonLoadSnapshot();
+    if (neonData) {
+      neonSyncAll(neonData);
+      return neonData;
     }
   }
 
@@ -48,12 +48,12 @@ export async function saveData(data: Record<string, any>): Promise<void> {
     if (!neonInited) {
       neonInited = await neonInitTables();
     }
-    if (neonInited) {
-      const neonOk = await neonSaveSnapshot(data);
-      if (neonOk) {
-        neonSyncAll(data);
-        savedToNeon = true;
-      }
+    // Always try to save, even if table init failed
+    // (the snapshots table may already exist from a previous run)
+    const neonOk = await neonSaveSnapshot(data);
+    if (neonOk) {
+      neonSyncAll(data);
+      savedToNeon = true;
     }
   }
 
