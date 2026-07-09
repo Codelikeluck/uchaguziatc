@@ -125,13 +125,15 @@ class Database {
       { id: 'stud_2', admissionNumber: '23050513013', name: 'Jane Lissah', email: 'jane@atc.ac.tz', department: 'ICT', yearOfStudy: 3 },
       { id: 'stud_3', admissionNumber: '23050513014', name: 'John Mushi', email: 'john@atc.ac.tz', department: 'Electrical', yearOfStudy: 2 },
       { id: 'stud_4', admissionNumber: '23050513015', name: 'Amina Juma', email: 'amina@atc.ac.tz', department: 'Civil Engineering', yearOfStudy: 4 },
+      { id: 'stud_5', admissionNumber: '23050513016', name: 'Sarah Kiwango', email: 'sarah@atc.ac.tz', department: 'ICT', yearOfStudy: 3 },
     ];
     sampleStudents.forEach(s => this.students.set(s.id, { ...s, hasVoted: false }));
 
     const sampleCandidates = [
-      { id: 'cand_1', studentId: 'stud_2', name: 'Jane Lissah', position: 'President', manifesto: 'Transparency and accountability for all students.', imageUrl: 'https://ui-avatars.com/api/?name=Jane+Lissah&background=1e40af&color=fff&size=200', documents: [], gpa: 3.9, yearOfStudy: 3, status: 'approved' as const, votes: 0 },
-      { id: 'cand_2', studentId: 'stud_3', name: 'John Mushi', position: 'President', manifesto: 'Better facilities and academic support.', imageUrl: 'https://ui-avatars.com/api/?name=John+Mushi&background=059669&color=fff&size=200', documents: [], gpa: 3.5, yearOfStudy: 2, status: 'approved' as const, votes: 0 },
-      { id: 'cand_3', studentId: 'stud_4', name: 'Amina Juma', position: 'Vice President', manifesto: 'Unity and diversity in student leadership.', imageUrl: 'https://ui-avatars.com/api/?name=Amina+Juma&background=d97706&color=fff&size=200', documents: [], gpa: 3.7, yearOfStudy: 4, status: 'approved' as const, votes: 0 },
+      { id: 'cand_1', studentId: 'stud_2', name: 'Jane Lissah', position: 'President', manifesto: 'Transparency and accountability for all students.', imageUrl: 'https://ui-avatars.com/api/?name=Jane+Lissah&background=1e40af&color=fff&size=200', documents: [], gpa: 3.9, yearOfStudy: 3, status: 'approved' as const, votes: 0, runningMateId: 'cand_3_vp' },
+      { id: 'cand_2', studentId: 'stud_3', name: 'John Mushi', position: 'President', manifesto: 'Better facilities and academic support.', imageUrl: 'https://ui-avatars.com/api/?name=John+Mushi&background=059669&color=fff&size=200', documents: [], gpa: 3.5, yearOfStudy: 2, status: 'approved' as const, votes: 0, runningMateId: 'cand_4_vp' },
+      { id: 'cand_3_vp', studentId: 'stud_4', name: 'Amina Juma', position: 'Vice President', manifesto: 'Unity and diversity in student leadership.', imageUrl: 'https://ui-avatars.com/api/?name=Amina+Juma&background=d97706&color=fff&size=200', documents: [], gpa: 3.7, yearOfStudy: 4, status: 'approved' as const, votes: 0, runningMateId: 'cand_1' },
+      { id: 'cand_4_vp', studentId: 'stud_5', name: 'Sarah Kiwango', position: 'Vice President', manifesto: 'Tech-driven administration for modern SOATECO.', imageUrl: 'https://ui-avatars.com/api/?name=Sarah+Kiwango&background=8b5cf6&color=fff&size=200', documents: [], gpa: 3.6, yearOfStudy: 3, status: 'approved' as const, votes: 0, runningMateId: 'cand_2' },
     ];
     sampleCandidates.forEach(c => this.candidates.set(c.id, c));
 
@@ -374,8 +376,15 @@ class Database {
 
   async createAdminSession(token: string, username: string): Promise<void> {
     await this.ensureInit();
+    // Invalidate any existing sessions for this admin
+    for (const [existingToken, session] of this.adminSessions.entries()) {
+      if (session.username === username) {
+        this.adminSessions.delete(existingToken);
+        await kvDel(`session:${existingToken}`);
+      }
+    }
     this.adminSessions.set(token, { username });
-    await kvSet(`session:${token}`, { username });
+    await kvSet(`session:${token}`, { username }, 86400);
     await this.persist();
   }
 

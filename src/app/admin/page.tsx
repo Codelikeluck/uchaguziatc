@@ -297,7 +297,7 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ action: 'approveCandidate', token, electionData: { candidateId: id } }),
+        body: JSON.stringify({ action: 'approveCandidate', token, candidateId: id }),
       });
       const data = await res.json();
       if (data.success) {
@@ -418,9 +418,11 @@ export default function AdminPage() {
               Sign In
             </button>
           </div>
-          <p className="text-xs text-slate-500 text-center mt-4">
-            Demo: <strong>soateco_admin</strong> / <strong>ATC_Secure2024!</strong>
-          </p>
+          {process.env.NODE_ENV !== 'production' && (
+            <p className="text-xs text-slate-500 text-center mt-4">
+              Demo: <strong>soateco_admin</strong> / <strong>ATC_Secure2024!</strong>
+            </p>
+          )}
           <Link href="/" className="block text-center text-sm text-slate-500 hover:text-atc-primary mt-4">Back to Home</Link>
         </div>
       </div>

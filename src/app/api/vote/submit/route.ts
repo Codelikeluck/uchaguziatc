@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Already voted' }, { status: 403 });
     }
 
-    const { candidateId, electionId } = await request.json();
+    const { candidateId, runningMateId, electionId } = await request.json();
     if (!candidateId || !electionId) {
       return NextResponse.json({ error: 'Candidate and election required' }, { status: 400 });
     }
@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
       voteHash,
       electionId,
       candidateId,
+      runningMateId: runningMateId || undefined,
       timestamp,
       blockIndex: (await blockchain.getLatestBlock())!.index + 1,
       merkleProof: [],

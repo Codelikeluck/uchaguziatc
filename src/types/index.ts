@@ -22,6 +22,7 @@ export interface Candidate {
   yearOfStudy: number;
   status: 'pending' | 'approved' | 'rejected';
   votes: number;
+  runningMateId?: string;
 }
 
 export interface Election {
@@ -46,6 +47,7 @@ export interface Vote {
   voteHash: string;
   electionId: string;
   candidateId: string;
+  runningMateId?: string;
   timestamp: number;
   blockIndex: number;
   merkleProof: string[];

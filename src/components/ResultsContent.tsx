@@ -16,6 +16,9 @@ interface Result {
     votes: number;
     percentage: number;
     imageUrl?: string;
+    runningMateId?: string;
+    runningMateName?: string;
+    runningMateImage?: string;
   }[];
 }
 
@@ -41,24 +44,40 @@ export default function ResultsContent() {
       const res = await fetch('/api/candidates');
       const data = await res.json();
       if (data.success) {
-        const candidates = data.candidates.filter((c: any) => c.status === 'approved');
-        const positions = Array.from(new Set<string>(candidates.map((c: any) => c.position as string)));
-        const totalVotes = candidates.reduce((sum: number, c: any) => sum + c.votes, 0);
+        const allCandidates = data.candidates.filter((c: any) => c.status === 'approved');
+        const positions = Array.from(new Set<string>(allCandidates.map((c: any) => c.position as string)));
 
-        const formatted: Result[] = positions.map((pos: string) => ({
-          position: pos,
-          candidates: candidates
-            .filter((c: any) => c.position === pos)
-            .map((c: any) => ({
-              id: c.id,
-              name: c.name,
-              votes: c.votes,
-              percentage: totalVotes > 0 ? Math.round((c.votes / totalVotes) * 100) : 0,
-              imageUrl: c.imageUrl,
-            }))
-            .sort((a: any, b: any) => b.votes - a.votes),
-        }));
-        setResults(formatted);
+        const formatted: Result[] = positions.map((pos: string) => {
+          const posCandidates = allCandidates.filter((c: any) => c.position === pos);
+          const totalVotes = posCandidates.reduce((sum: number, c: any) => sum + c.votes, 0);
+
+          return {
+            position: pos,
+            candidates: posCandidates
+              .map((c: any) => ({
+                id: c.id,
+                name: c.name,
+                votes: c.votes,
+                percentage: totalVotes > 0 ? Math.round((c.votes / totalVotes) * 100) : 0,
+                imageUrl: c.imageUrl,
+                runningMateId: c.runningMateId,
+              }))
+              .sort((a: any, b: any) => b.votes - a.votes),
+          };
+        });
+
+        // Show President tickets with running mates
+        const presSlot = formatted.find(f => f.position === 'President');
+        if (presSlot) {
+          const vpCandidates = allCandidates.filter((c: any) => c.position === 'Vice President');
+          presSlot.candidates = presSlot.candidates.map((c: any) => {
+            const vp = vpCandidates.find((v: any) => v.id === c.runningMateId);
+            return { ...c, runningMateName: vp?.name || '', runningMateImage: vp?.imageUrl || '' };
+          });
+        }
+
+        // Remove VP as a separate position (shown as running mates under President)
+        setResults(formatted.filter(f => f.position !== 'Vice President'));
       }
     } catch (e) { console.error('Fetch results error:', e); }
   };
@@ -227,7 +246,14 @@ export default function ResultsContent() {
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-slate-500">{idx + 1}{idx === 0 ? 'st' : idx === 1 ? 'nd' : idx === 2 ? 'rd' : 'th'} place</div>
+                            <div className="flex items-center gap-1 text-xs text-slate-500">
+                              {candidate.runningMateName && (
+                                <span>Running with {candidate.runningMateName}</span>
+                              )}
+                              {!candidate.runningMateName && (
+                                <span>{idx + 1}{idx === 0 ? 'st' : idx === 1 ? 'nd' : idx === 2 ? 'rd' : 'th'} place</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="text-right">
@@ -235,6 +261,18 @@ export default function ResultsContent() {
                           <div className="text-sm text-slate-500">{candidate.percentage}%</div>
                         </div>
                       </div>
+                      {candidate.runningMateName && (
+                        <div className="ml-12 mb-2 flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                          <img 
+                            src={candidate.runningMateImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(candidate.runningMateName)}&background=8b5cf6&color=fff&size=200`}
+                            alt={candidate.runningMateName}
+                            className="w-7 h-7 rounded-full object-cover border border-slate-300"
+                          />
+                          <span className="text-xs text-slate-600">
+                            <span className="font-medium text-slate-700">{candidate.runningMateName}</span> — Vice President
+                          </span>
+                        </div>
+                      )}
                       <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-1000 ${

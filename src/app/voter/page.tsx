@@ -23,6 +23,7 @@ interface Candidate {
   votes: number;
   imageUrl?: string;
   status: 'pending' | 'approved' | 'rejected';
+  runningMateId?: string;
 }
 
 interface ReceiptData {
@@ -42,7 +43,7 @@ export default function VoterPage() {
   const [token, setToken] = useState('');
   const [student, setStudent] = useState<Student | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [selectedCandidate, setSelectedCandidate] = useState<string>('');
+  const [selectedTicket, setSelectedTicket] = useState<string>('');
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -130,9 +131,10 @@ export default function VoterPage() {
   };
 
   const submitVote = async () => {
-    if (!selectedCandidate) return;
+    if (!selectedTicket) return;
     setLoading(true);
     setError('');
+    const pres = candidates.find(c => c.id === selectedTicket);
     try {
       const res = await fetch('/api/vote/submit', {
         method: 'POST',
@@ -141,7 +143,8 @@ export default function VoterPage() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ 
-          candidateId: selectedCandidate, 
+          candidateId: selectedTicket,
+          runningMateId: pres?.runningMateId || '',
           electionId: election?.id || 'election_2024' 
         }),
       });
@@ -157,8 +160,6 @@ export default function VoterPage() {
     }
     setLoading(false);
   };
-
-  const positions = Array.from(new Set<string>(candidates.map(c => c.position)));
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -296,9 +297,11 @@ export default function VoterPage() {
                 Request OTP
               </button>
             </div>
-            <p className="text-xs text-slate-500 text-center mt-4">
-              Demo: Try admission number <strong>23050513012</strong>
-            </p>
+            {process.env.NODE_ENV !== 'production' && (
+              <p className="text-xs text-slate-500 text-center mt-4">
+                Demo: Try admission number <strong>23050513012</strong>
+              </p>
+            )}
           </div>
         )}
 
@@ -387,51 +390,70 @@ export default function VoterPage() {
               </div>
             ) : (
               <div className="space-y-8">
-                {positions.map(position => (
-                  <div key={position} className="atc-card">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                      <Vote className="w-5 h-5 text-atc-primary" />
-                      {position}
-                    </h3>
-                    <div className="grid md:grid-cols-2 gap-4">
-                      {candidates.filter(c => c.position === position).map(candidate => (
+                <div className="atc-card">
+                  <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <Vote className="w-5 h-5 text-atc-primary" />
+                    Presidential Ticket
+                  </h3>
+                  <p className="text-sm text-slate-500 mb-6">
+                    Select a President and their running Vice President as a ticket
+                  </p>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {candidates.filter(c => c.position === 'President' && c.runningMateId).map(pres => {
+                      const vp = candidates.find(c => c.id === pres.runningMateId);
+                      const isSelected = selectedTicket === pres.id;
+                      return (
                         <div
-                          key={candidate.id}
-                          onClick={() => setSelectedCandidate(candidate.id)}
+                          key={pres.id}
+                          onClick={() => setSelectedTicket(pres.id)}
                           className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                            selectedCandidate === candidate.id 
+                            isSelected 
                               ? 'border-atc-primary bg-blue-50' 
                               : 'border-slate-200 hover:border-slate-300'
                           }`}
                         >
                           <div className="flex items-start gap-4">
                             <img 
-                              src={candidate.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(candidate.name)}&background=1e40af&color=fff&size=200`}
-                              alt={candidate.name}
+                              src={pres.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(pres.name)}&background=1e40af&color=fff&size=200`}
+                              alt={pres.name}
                               className={`w-14 h-14 rounded-full object-cover border-2 flex-shrink-0 ${
-                                selectedCandidate === candidate.id ? 'border-atc-primary' : 'border-slate-200'
+                                isSelected ? 'border-atc-primary' : 'border-slate-200'
                               }`}
                             />
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <h4 className="font-bold text-slate-900">{candidate.name}</h4>
-                                {selectedCandidate === candidate.id && (
+                                <h4 className="font-bold text-slate-900">{pres.name}</h4>
+                                {isSelected && (
                                   <CheckCircle className="w-5 h-5 text-atc-primary" />
                                 )}
                               </div>
-                              <p className="text-sm text-slate-600 mt-1">{candidate.manifesto}</p>
+                              <span className="text-xs text-atc-primary font-medium">President</span>
+                              <p className="text-sm text-slate-600 mt-1">{pres.manifesto}</p>
+                              {vp && (
+                                <div className="mt-3 pt-3 border-t border-slate-200 flex items-center gap-2">
+                                  <img 
+                                    src={vp.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(vp.name)}&background=8b5cf6&color=fff&size=200`}
+                                    alt={vp.name}
+                                    className="w-8 h-8 rounded-full object-cover border border-slate-300"
+                                  />
+                                  <div>
+                                    <span className="text-sm font-medium text-slate-700">{vp.name}</span>
+                                    <span className="text-xs text-slate-500 ml-1">(VP)</span>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                ))}
+                </div>
 
                 <div className="flex gap-4">
                   <button
                     onClick={() => setStep('confirm')}
-                    disabled={!selectedCandidate}
+                    disabled={!selectedTicket}
                     className="atc-btn-primary flex-1 justify-center inline-flex items-center gap-2 disabled:opacity-50"
                   >
                     <Vote className="w-5 h-5" />
@@ -444,7 +466,7 @@ export default function VoterPage() {
         )}
 
         {/* Confirm Step */}
-        {step === 'confirm' && selectedCandidate && (
+        {step === 'confirm' && selectedTicket && (
           <div className="atc-card max-w-lg mx-auto">
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -454,14 +476,21 @@ export default function VoterPage() {
               <p className="text-slate-600">This action is irreversible. Your vote will be encrypted and recorded on the blockchain.</p>
             </div>
 
-            <div className="bg-slate-50 rounded-lg p-6 mb-6">
-              <div className="text-sm text-slate-500 mb-1">Selected Candidate</div>
-              <div className="text-xl font-bold text-slate-900">
-                {candidates.find(c => c.id === selectedCandidate)?.name}
+            <div className="bg-slate-50 rounded-lg p-6 mb-6 space-y-4">
+              <div>
+                <div className="text-sm text-slate-500 mb-1">President</div>
+                <div className="text-xl font-bold text-slate-900">
+                  {candidates.find(c => c.id === selectedTicket)?.name}
+                </div>
               </div>
-              <div className="text-sm text-atc-primary mt-1">
-                {candidates.find(c => c.id === selectedCandidate)?.position}
-              </div>
+              {candidates.find(c => c.id === selectedTicket)?.runningMateId && (
+                <div className="pt-4 border-t border-slate-200">
+                  <div className="text-sm text-slate-500 mb-1">Vice President</div>
+                  <div className="text-xl font-bold text-slate-900">
+                    {candidates.find(c => c.id === candidates.find(p => p.id === selectedTicket)?.runningMateId)?.name}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">
