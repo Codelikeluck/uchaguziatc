@@ -17,8 +17,12 @@ export async function GET(request: NextRequest) {
     console.log(`[verify] vote found:`, !!vote);
     if (!vote) {
       const allVotes = await db.getAllVotes();
-      console.log(`[verify] all vote hashes in memory:`, allVotes.map(v => v.voteHash));
-      return NextResponse.json({ error: 'Vote not found' }, { status: 404 });
+      console.log(`[verify] all vote hashes in memory (${allVotes.length} total):`, allVotes.map(v => v.voteHash));
+      const recent = allVotes.slice(-3).map(v => v.voteHash.slice(0, 16) + '...');
+      return NextResponse.json({
+        error: 'Vote not found. Please check the hash and try again.',
+        debug: { receivedHash: voteHash, receivedLength: voteHash.length, totalVotesInDb: allVotes.length, recentVoteHashes: recent }
+      }, { status: 404 });
     }
 
     const inclusion = await blockchain.verifyVoteInclusion(voteHash);
