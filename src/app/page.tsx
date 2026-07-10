@@ -44,7 +44,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      {election?.endDate && (
+      {election?.endDate && election?.status === 'active' && (
         <div className="bg-gradient-to-r from-atc-primary to-blue-700">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2 text-white">

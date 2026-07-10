@@ -155,7 +155,7 @@ export default function ResultsContent() {
               <p className="text-emerald-200 text-sm">{election?.title}</p>
             </div>
           </div>
-        ) : election?.endDate && (
+        ) : election?.endDate && election?.status === 'active' && (
           <div className="atc-card bg-gradient-to-r from-atc-primary to-blue-700 text-white mb-8">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-3">
