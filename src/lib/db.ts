@@ -13,6 +13,7 @@ interface AdminAccount {
 }
 
 interface DbSnapshot {
+  _version: number;
   students: [string, Student][];
   candidates: [string, Candidate][];
   elections: [string, Election][];
@@ -35,6 +36,7 @@ class Database {
   private adminSessions: Map<string, { username: string }> = new Map();
   private admins: Map<string, AdminAccount> = new Map();
   private persistQueue: Promise<void> = Promise.resolve();
+  private _snapshotVersion = 0;
 
   private initPromise: Promise<void>;
   private initialized = false;
@@ -66,6 +68,7 @@ class Database {
   }
 
   private loadFromData(data: Record<string, any>) {
+    this._snapshotVersion = data._version || 0;
     this.students = new Map(data.students || []);
     this.candidates = new Map(data.candidates || []);
     this.elections = new Map(data.elections || []);
@@ -84,7 +87,9 @@ class Database {
 
   private async persist(): Promise<void> {
     this.persistQueue = this.persistQueue.then(async () => {
+      this._snapshotVersion++;
       const snapshot: DbSnapshot = {
+        _version: this._snapshotVersion,
         students: Array.from(this.students.entries()),
         candidates: Array.from(this.candidates.entries()),
         elections: Array.from(this.elections.entries()),

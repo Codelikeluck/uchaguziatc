@@ -22,31 +22,42 @@ export function loadDataSync(): Record<string, any> | null {
 }
 
 export async function loadData(): Promise<Record<string, any> | null> {
+  const snapshots: { source: string; data: Record<string, any>; version: number }[] = [];
+
+  // Read file
+  const fileData = loadDataSync();
+  if (fileData) {
+    console.log(`loadData: file snapshot (version=${fileData._version || 0}, students=${fileData.students?.length || 0})`);
+    snapshots.push({ source: 'file', data: fileData, version: fileData._version || 0 });
+  }
+
+  // Read KV
+  const kvData = await kvGet<Record<string, any>>(KV_KEY);
+  if (kvData) {
+    console.log(`loadData: KV snapshot (version=${kvData._version || 0}, students=${kvData.students?.length || 0})`);
+    snapshots.push({ source: 'kv', data: kvData, version: kvData._version || 0 });
+  }
+
+  // Read Neon
   if (process.env.DATABASE_URL) {
     if (!neonInited) {
       neonInited = await neonInitTables();
     }
-    console.log(`loadData: neonInited=${neonInited}, trying neonLoadSnapshot`);
     const neonData = await neonLoadSnapshot();
     if (neonData) {
-      console.log(`loadData: neon snapshot found (students: ${neonData.students?.length || 0})`);
+      console.log(`loadData: neon snapshot (version=${neonData._version || 0}, students=${neonData.students?.length || 0})`);
       neonSyncAll(neonData);
-      return neonData;
+      snapshots.push({ source: 'neon', data: neonData, version: neonData._version || 0 });
     }
-    console.log('loadData: neon returned null, falling through');
-  } else {
-    console.log('loadData: DATABASE_URL not set, skipping neon');
   }
 
-  console.log('loadData: trying KV');
-  const kvData = await kvGet<Record<string, any>>(KV_KEY);
-  if (kvData) {
-    console.log('loadData: KV found data');
-    return kvData;
-  }
+  if (snapshots.length === 0) { return null; }
 
-  console.log('loadData: trying file');
-  return loadDataSync();
+  // Pick the highest version — prevents stale data from any source
+  snapshots.sort((a, b) => b.version - a.version);
+  const best = snapshots[0];
+  console.log(`loadData: picked ${best.source} (version=${best.version})`);
+  return best.data;
 }
 
 export async function saveData(data: Record<string, any>): Promise<void> {

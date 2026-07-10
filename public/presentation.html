@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ATC Blockchain Voting System</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0f172a;
+      color: #fff;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+    }
+    .slide-deck {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+    @media (min-width: 769px) {
+      .slide-deck {
+        max-width: calc(100vh * 16 / 9);
+        max-height: calc(100vw * 9 / 16);
+        margin: auto;
+        position: absolute;
+        inset: 0;
+      }
+    }
+    .slide {
+      position: absolute;
+      width: 100%; height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 60px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.4s;
+      overflow: hidden;
+    }
+    .slide.active { opacity: 1; visibility: visible; }
+    .slide-content {
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    h1 {
+      font-size: clamp(36px, 5vw, 64px);
+      font-weight: 800;
+      line-height: 1.1;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    h2 {
+      font-size: clamp(22px, 3vw, 36px);
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+    h3 {
+      font-size: clamp(16px, 2vw, 22px);
+      font-weight: 600;
+      color: #60a5fa;
+    }
+    p, li {
+      font-size: clamp(14px, 1.5vw, 18px);
+      line-height: 1.6;
+      color: #cbd5e1;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card h3 { margin-bottom: 8px; }
+    .card p, .card li { font-size: clamp(12px, 1.2vw, 15px); }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-green { background: rgba(52,211,153,0.15); color: #34d399; }
+    .badge-red { background: rgba(248,113,113,0.15); color: #f87171; }
+    .badge-blue { background: rgba(96,165,250,0.15); color: #60a5fa; }
+    .badge-amber { background: rgba(251,191,36,0.15); color: #fbbf24; }
+    ul { list-style: none; padding: 0; }
+    ul li { padding: 4px 0; }
+    ul li::before { content: "▸ "; color: #60a5fa; }
+    .flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .flow-step {
+      background: rgba(96,165,250,0.1);
+      border: 1px solid rgba(96,165,250,0.3);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: clamp(11px, 1vw, 14px);
+      font-weight: 500;
+      color: #93c5fd;
+    }
+    .flow-arrow { color: #475569; font-size: 18px; }
+    .progress-bar {
+      position: fixed; top: 0; left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #60a5fa, #a78bfa);
+      transition: width 0.3s;
+      z-index: 1000;
+    }
+    .nav-controls {
+      position: fixed; bottom: 30px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; align-items: center; gap: 20px;
+      z-index: 1000;
+    }
+    .nav-btn {
+      background: rgba(255,255,255,0.1);
+      border: none; color: #fff;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 18px;
+      transition: background 0.2s;
+    }
+    .nav-btn:hover { background: rgba(255,255,255,0.2); }
+    .slide-counter { color: rgba(255,255,255,0.4); font-size: 14px; }
+    .tagline { font-size: clamp(16px, 2vw, 24px); color: #94a3b8; font-weight: 400; }
+    .stat-row {
+      display: flex;
+      justify-content: space-around;
+      text-align: center;
+      margin: 16px 0;
+    }
+    .stat-number {
+      font-size: clamp(28px, 3vw, 42px);
+      font-weight: 800;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .stat-label { font-size: clamp(11px, 1vw, 14px); color: #94a3b8; margin-top: 4px; }
+
+    @media (max-width: 768px) {
+      .slide { padding: 32px 20px; }
+      .grid-2 { grid-template-columns: 1fr; gap: 16px; }
+      .grid-3 { grid-template-columns: 1fr; gap: 16px; }
+      .flow { gap: 4px; }
+      .flow-step { padding: 4px 10px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress-bar" id="progressBar"></div>
+  <div class="slide-deck">
+
+    <!-- SLIDE 1: Title + Comparison + How Blockchain Works -->
+    <div class="slide active">
+      <div class="slide-content">
+        <div style="text-align: center; margin-bottom: 12px;">
+          <div style="width: 56px; height: 56px; background: linear-gradient(135deg, #1e40af, #7c3aed); border-radius: 14px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 28px;">⧫</div>
+          <h1>BTC Blockchain Voting System</h1>
+          <p class="tagline">Securing Democracy Through Cryptographic Integrity</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3 style="color: #f87171;">Ordinary Online Voting</h3>
+            <ul>
+              <li>Centralized database — single point of failure</li>
+              <li>Votes stored in plaintext or simple encryption</li>
+              <li>No public verifiability — trust the server blindly</li>
+              <li>Audit logs can be altered retroactively</li>
+              <li>No cryptographic proof of vote inclusion</li>
+              <li>Requires trust in a central authority</li>
+            </ul>
+          </div>
+          <div class="card" style="border-color: rgba(52,211,153,0.3);">
+            <h3 style="color: #34d399;">ATC Blockchain Voting</h3>
+            <ul>
+              <li>Decentralized ledger — tamper-proof by design</li>
+              <li>SHA-256 hashed votes with Merkle tree proofs</li>
+              <li>Public verification — enter your vote hash to verify</li>
+              <li>Blockchain immutability — past blocks cannot change</li>
+              <li>Each voter receives a cryptographic receipt</li>
+              <li>Zero-knowledge inspired — trust the math, not the admin</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card" style="text-align: center;">
+          <h3>How the Blockchain Works in This System</h3>
+          <div class="flow" style="margin-top: 12px;">
+            <span class="flow-step">Vote Cast</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">SHA-256 Hash</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">Merkle Tree Root</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">Proof-of-Work</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">Mined Block</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">Chained to Ledger</span>
+          </div>
+          <p style="margin-top: 12px; font-size: clamp(12px, 1.1vw, 14px); color: #94a3b8;">
+            Each vote is cryptographically hashed, combined into a Merkle tree, and sealed in a block 
+            with proof-of-work. The block is appended to an immutable chain. Voters get a unique hash 
+            to verify their vote was included — without revealing who they voted for.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: Achievements + Development Process -->
+    <div class="slide">
+      <div class="slide-content">
+        <div style="text-align: center;">
+          <h1 style="font-size: clamp(28px, 3.5vw, 48px);">Achievements & Development Process</h1>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <div class="card" style="margin-bottom: 16px;">
+              <h3>System Achievements</h3>
+              <div class="stat-row">
+                <div><div class="stat-number">SHA-256</div><div class="stat-label">Cryptographic Hashing</div></div>
+                <div><div class="stat-number">Merkle</div><div class="stat-label">Tree Proofs</div></div>
+                <div><div class="stat-number">PoW</div><div class="stat-label">Block Mining</div></div>
+              </div>
+              <ul>
+                <li><strong>Immutability:</strong> Once mined, vote data cannot be altered without re-mining every subsequent block</li>
+                <li><strong>Verifiability:</strong> Voters can independently verify their vote on the public ledger using their receipt hash</li>
+                <li><strong>Transparency:</strong> Full block explorer on the results page — anyone can inspect the chain</li>
+                <li><strong>Integrity:</strong> Merkle root ensures tampering with any single vote breaks the chain</li>
+                <li><strong>Audit trail:</strong> Every admin action (add/delete/approve) is logged as a blockchain audit event</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>Key Differentiators</h3>
+              <ul>
+                <li>Each voter gets a <strong>cryptographic receipt</strong> — not just a confirmation screen</li>
+                <li>Vote verification via <strong>public results page</strong> — no login required</li>
+                <li><strong>President/VP ticket system</strong> — pair candidates on-chain</li>
+                <li><strong>Smart contract</strong> addresses deployed for transparency</li>
+                <li>OTP-based voter authentication with blockchain-anchored audit</li>
+              </ul>
+            </div>
+          </div>
+
+          <div>
+            <div class="card" style="margin-bottom: 16px;">
+              <h3>Development Process</h3>
+              <div class="grid-3" style="margin-top: 8px;">
+                <div class="card" style="padding: 12px; text-align: center;">
+                  <span class="badge badge-blue">Phase 1</span>
+                  <p style="margin-top: 6px; font-size: 13px; font-weight: 600;">Architecture</p>
+                  <p style="font-size: 12px; color: #94a3b8;">Next.js + TypeScript, Mock blockchain, Database design, KV + Neon persistence</p>
+                </div>
+                <div class="card" style="padding: 12px; text-align: center;">
+                  <span class="badge badge-amber">Phase 2</span>
+                  <p style="margin-top: 6px; font-size: 13px; font-weight: 600;">Core Engine</p>
+                  <p style="font-size: 12px; color: #94a3b8;">Block creation, SHA-256 hashing, Merkle tree, Proof-of-work mining, Audit logging</p>
+                </div>
+                <div class="card" style="padding: 12px; text-align: center;">
+                  <span class="badge badge-green">Phase 3</span>
+                  <p style="margin-top: 6px; font-size: 13px; font-weight: 600;">Application</p>
+                  <p style="font-size: 12px; color: #94a3b8;">Admin panel, Voter portal, Candidate registration, Results & verification, Countdown timer</p>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <h3>Technical Summary</h3>
+              <div class="grid-2" style="gap: 8px; margin-top: 8px;">
+                <div><span class="badge badge-blue">Frontend</span><p style="font-size: 12px; margin-top: 4px;">React 18, Next.js 14, Tailwind CSS, shadcn/ui</p></div>
+                <div><span class="badge badge-amber">Backend</span><p style="font-size: 12px; margin-top: 4px;">Next.js API routes, Serverless-ready, KV + Neon + File persistence</p></div>
+                <div><span class="badge badge-green">Blockchain</span><p style="font-size: 12px; margin-top: 4px;">Custom TypeScript chain, SHA-256, Merkle tree, PoW mining, Genesis block</p></div>
+                <div><span class="badge badge-red">Security</span><p style="font-size: 12px; margin-top: 4px;">OTP auth, Admin sessions, Encrypted votes, Blockchain audit trail</p></div>
+              </div>
+              <div style="margin-top: 12px; padding: 12px; background: rgba(96,165,250,0.05); border-radius: 8px; border: 1px solid rgba(96,165,250,0.15);">
+                <p style="font-size: 13px; color: #93c5fd; text-align: center;">
+                  ATC Voting System — Built with Next.js 14 · SHA-256 · Merkle Trees · Proof-of-Work · TypeScript
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="nav-controls">
+    <button class="nav-btn" onclick="prevSlide()">←</button>
+    <span class="slide-counter"><span id="current">1</span> / <span id="total">2</span></span>
+    <button class="nav-btn" onclick="nextSlide()">→</button>
+  </div>
+
+  <script>
+    let current = 1;
+    const total = document.querySelectorAll('.slide').length;
+    document.getElementById('total').textContent = total;
+
+    function showSlide(n) {
+      if (n < 1) n = 1;
+      if (n > total) n = total;
+      current = n;
+      document.querySelectorAll('.slide').forEach((s, i) => {
+        s.classList.toggle('active', i === n - 1);
+      });
+      document.getElementById('current').textContent = n;
+      document.getElementById('progressBar').style.width = (n / total * 100) + '%';
+    }
+
+    function nextSlide() { showSlide(current + 1); }
+    function prevSlide() { showSlide(current - 1); }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.nav-controls')) nextSlide();
+    });
+    showSlide(1);
+  </script>
+</body>
+</html>
