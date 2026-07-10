@@ -34,6 +34,7 @@ export interface Election {
   status: 'upcoming' | 'active' | 'closed';
   totalVoters: number;
   totalVotes: number;
+  updatedAt?: number;
 }
 
 export interface Position {

@@ -118,6 +118,7 @@ class Database {
       status: 'active',
       totalVoters: 0,
       totalVotes: 0,
+      updatedAt: 0,
     };
     this.elections.set(election.id, election);
 
@@ -251,7 +252,7 @@ class Database {
     await this.ensureInit();
     const election = this.elections.get(id);
     if (!election) return undefined;
-    const updated = { ...election, ...data };
+    const updated = { ...election, ...data, updatedAt: Date.now() };
     this.elections.set(id, updated);
     await this.persist();
     if (process.env.DATABASE_URL) neonSaveElectionFn(updated);

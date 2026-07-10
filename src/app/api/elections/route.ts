@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     const all = await db.getAllElections();
-    const latest = all.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())[0];
+    const latest = all.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
     return NextResponse.json({ success: true, election: latest || null });
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
