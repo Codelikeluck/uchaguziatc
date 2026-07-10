@@ -100,6 +100,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'Election deleted' });
     }
 
+    if (action === 'closeElection') {
+      if (!electionData?.id) {
+        return NextResponse.json({ error: 'Election ID required' }, { status: 400 });
+      }
+      const election = await db.getElection(electionData.id);
+      if (!election) {
+        return NextResponse.json({ error: 'Election not found' }, { status: 404 });
+      }
+      const updated = await db.updateElection(electionData.id, { status: 'closed' });
+      if (!updated) {
+        return NextResponse.json({ error: 'Failed to close election' }, { status: 500 });
+      }
+      await blockchain.logAuditEvent('ELECTION_CLOSED', sha256(electionData.id), 'ADMIN');
+      return NextResponse.json({ success: true, election: updated });
+    }
+
     if (action === 'approveCandidate') {
       if (!candidateId) {
         return NextResponse.json({ error: 'Candidate ID required' }, { status: 400 });

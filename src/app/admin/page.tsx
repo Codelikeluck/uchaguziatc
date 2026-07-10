@@ -588,6 +588,30 @@ export default function AdminPage() {
                       >
                         <Edit3 className="w-4 h-4" />
                       </button>
+                      {election.status === 'active' && (
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Close election "${election.title}"? This will prevent further voting.`)) return;
+                            try {
+                              const res = await fetch('/api/admin/config', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                body: JSON.stringify({ action: 'closeElection', electionData: { id: election.id } }),
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                setElections(elections.map(e => e.id === election.id ? data.election : e));
+                              } else {
+                                setError(data.error);
+                              }
+                            } catch (e) { console.error('Close election error:', e); }
+                          }}
+                          className="p-2 text-slate-500 hover:text-atc-accent transition-colors"
+                          title="Close Election"
+                        >
+                          <Lock className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         onClick={async () => {
                           if (!confirm(`Delete election "${election.title}"?`)) return;
@@ -628,7 +652,6 @@ export default function AdminPage() {
                             className="atc-input text-sm py-2">
                             <option value="upcoming">Upcoming</option>
                             <option value="active">Active</option>
-                            <option value="closed">Closed</option>
                           </select>
                         </div>
                       </div>

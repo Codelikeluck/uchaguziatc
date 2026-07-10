@@ -102,6 +102,7 @@ class Database {
 
   private async seedData() {
     if (this.students.size > 0 || this.candidates.size > 0) return;
+    if (this.elections.size > 0) return;
 
     const election: Election = {
       id: 'election_2024',
