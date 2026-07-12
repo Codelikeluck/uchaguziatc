@@ -54,7 +54,7 @@ export default function AdminPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'elections' | 'candidates' | 'students' | 'admins' | 'blockchain' | 'audit'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'elections' | 'candidates' | 'students' | 'admins' | 'blockchain' | 'audit' | 'reports'>('overview');
   const [admins, setAdmins] = useState<{ id: string; username: string; role: string; createdAt: number }[]>([]);
   const [showAddAdmin, setShowAddAdmin] = useState(false);
   const [newAdminUsername, setNewAdminUsername] = useState('');
@@ -395,6 +395,35 @@ export default function AdminPage() {
     setLoggedIn(false); setToken(''); setStats(null);
   };
 
+  const downloadReport = async (type: string) => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/admin/reports?type=${type}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setError(err.error || 'Download failed');
+        setLoading(false);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `atc-report-${type}-${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Download error:', e);
+      setError('Network error');
+    }
+    setLoading(false);
+  };
+
   const vpCandidates = candidates.filter(c => c.position === 'Vice President' && (c.status === 'approved' || c.status === 'pending'));
 
   const filteredStudents = students.filter(s => {
@@ -471,6 +500,7 @@ export default function AdminPage() {
             { key: 'admins', icon: Shield, label: 'Admins' },
             { key: 'blockchain', icon: Blocks, label: 'Blockchain' },
             { key: 'audit', icon: Activity, label: 'Audit' },
+            { key: 'reports', icon: FileSpreadsheet, label: 'Reports' },
           ].map(({ key, icon: Icon, label }) => (
             <button key={key} onClick={() => { setActiveTab(key as any); if (key === 'admins') fetchAdmins(); }}
               className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
@@ -1543,6 +1573,51 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {activeTab === 'reports' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-slate-900">Download Reports</h2>
+            </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <ReportCard
+                icon={<BarChart3 className="w-8 h-8 text-atc-primary" />}
+                title="Election Results"
+                desc="Per-position breakdown with vote counts, percentages, and winners."
+                loading={loading}
+                onDownload={() => downloadReport('elections')}
+              />
+              <ReportCard
+                icon={<Users className="w-8 h-8 text-atc-secondary" />}
+                title="Voters List"
+                desc="All registered students with admission numbers, departments, and voting status."
+                loading={loading}
+                onDownload={() => downloadReport('voters')}
+              />
+              <ReportCard
+                icon={<GraduationCap className="w-8 h-8 text-atc-accent" />}
+                title="Candidates"
+                desc="All candidate registrations with positions, GPA, status, and vote counts."
+                loading={loading}
+                onDownload={() => downloadReport('candidates')}
+              />
+              <ReportCard
+                icon={<Activity className="w-8 h-8 text-purple-600" />}
+                title="Audit Trail"
+                desc="System audit events with timestamps, actors, and block references."
+                loading={loading}
+                onDownload={() => downloadReport('audit')}
+              />
+              <ReportCard
+                icon={<Blocks className="w-8 h-8 text-cyan-600" />}
+                title="Blockchain"
+                desc="Full block list with hashes, nonces, Merkle roots, and transaction counts."
+                loading={loading}
+                onDownload={() => downloadReport('blockchain')}
+              />
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -1557,6 +1632,30 @@ function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: s
         <div className="text-sm text-slate-500">{label}</div>
         <div className="text-xs text-slate-400">{sub}</div>
       </div>
+    </div>
+  );
+}
+
+function ReportCard({ icon, title, desc, loading, onDownload }: {
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+  loading: boolean;
+  onDownload: () => void;
+}) {
+  return (
+    <div className="atc-card hover:shadow-xl transition-all duration-300">
+      <div className="mb-4">{icon}</div>
+      <h3 className="text-xl font-bold text-slate-900 mb-2">{title}</h3>
+      <p className="text-slate-600 text-sm mb-6 leading-relaxed">{desc}</p>
+      <button
+        onClick={onDownload}
+        disabled={loading}
+        className="atc-btn-primary text-sm py-2 px-4 inline-flex items-center gap-2 w-full justify-center disabled:opacity-50"
+      >
+        <Download className="w-4 h-4" />
+        Download CSV
+      </button>
     </div>
   );
 }
